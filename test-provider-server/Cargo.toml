@@ -1,6 +1,20 @@
 [package]
-name = "test-provider-server"
+name = "scim2-test-provider-server"
 version = "0.1.0"
 edition = "2024"
 
 [dependencies]
+anyhow.workspace = true
+dropshot.workspace = true
+schemars.workspace = true
+serde_json.workspace = true
+serde.workspace = true
+slog-async.workspace = true
+slog-term.workspace = true
+slog.workspace = true
+clap.workspace = true
+tokio.workspace = true
+http.workspace = true
+async-trait.workspace = true
+
+scim2-rs = { path = "../core" }

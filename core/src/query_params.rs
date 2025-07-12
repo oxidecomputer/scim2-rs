@@ -2,6 +2,13 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 
-pub struct User {
-    name: String,
+use super::*;
+
+#[derive(Deserialize, JsonSchema, Clone)]
+pub struct QueryParams {
+    // TODO: attributes
+
+    // TODO: pagination: start_index and count
+
+    // TODO: filter
 }
