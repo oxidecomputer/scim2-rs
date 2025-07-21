@@ -42,7 +42,7 @@ impl<T: ProviderStore> Provider<T> {
         &self,
         query_params: QueryParams,
         user_id: String,
-    ) -> Result<SingleResourceResponse, Error> {
+    ) -> Result<SingleResourceResponse<User>, Error> {
         let user = match self.store.get_user_by_id(user_id.clone()).await {
             Ok(user) => user,
 
@@ -63,15 +63,17 @@ impl<T: ProviderStore> Provider<T> {
             return Err(Error::not_found(user_id));
         };
 
-        SingleResourceResponse::from_resource(user, Some(query_params))
+        SingleResourceResponse::from_resource::<User>(user, Some(query_params))
     }
 
     pub async fn create_user(
         &self,
         request: CreateUserRequest,
-    ) -> Result<SingleResourceResponse, Error> {
+    ) -> Result<SingleResourceResponse<User>, Error> {
         match self.store.create_user(request).await {
-            Ok(user) => SingleResourceResponse::from_resource(user, None),
+            Ok(user) => {
+                SingleResourceResponse::from_resource::<User>(user, None)
+            }
 
             Err(e) => match e {
                 ProviderStoreError::Scim(e) => Err(e),
@@ -86,7 +88,7 @@ impl<T: ProviderStore> Provider<T> {
         &self,
         _user_id: String,
         _request: CreateUserRequest,
-    ) -> Result<SingleResourceResponse, Error> {
+    ) -> Result<SingleResourceResponse<User>, Error> {
         unimplemented!()
     }
 
@@ -136,7 +138,7 @@ impl<T: ProviderStore> Provider<T> {
         &self,
         query_params: QueryParams,
         group_id: String,
-    ) -> Result<SingleResourceResponse, Error> {
+    ) -> Result<SingleResourceResponse<Group>, Error> {
         let group = match self.store.get_group_by_id(group_id.clone()).await {
             Ok(group) => group,
 
@@ -157,15 +159,20 @@ impl<T: ProviderStore> Provider<T> {
             return Err(Error::not_found(group_id));
         };
 
-        SingleResourceResponse::from_resource(group, Some(query_params))
+        SingleResourceResponse::from_resource::<Group>(
+            group,
+            Some(query_params),
+        )
     }
 
     pub async fn create_group(
         &self,
         request: CreateGroupRequest,
-    ) -> Result<SingleResourceResponse, Error> {
+    ) -> Result<SingleResourceResponse<Group>, Error> {
         match self.store.create_group(request).await {
-            Ok(user) => SingleResourceResponse::from_resource(user, None),
+            Ok(group) => {
+                SingleResourceResponse::from_resource::<Group>(group, None)
+            }
 
             Err(e) => match e {
                 ProviderStoreError::Scim(e) => Err(e),
@@ -180,7 +187,7 @@ impl<T: ProviderStore> Provider<T> {
         &self,
         _group_id: String,
         _request: CreateGroupRequest,
-    ) -> Result<SingleResourceResponse, Error> {
+    ) -> Result<SingleResourceResponse<Group>, Error> {
         unimplemented!()
     }
 
@@ -191,17 +198,15 @@ impl<T: ProviderStore> Provider<T> {
         match self.store.delete_group_by_id(group_id.clone()).await {
             Ok(_) => deleted_http_response(),
 
-            Err(e) => {
-                return match e {
-                    ProviderStoreError::Scim(e) => Err(e),
+            Err(e) => match e {
+                ProviderStoreError::Scim(e) => Err(e),
 
-                    ProviderStoreError::StoreError(e) => {
-                        Err(Error::internal_error(format!(
-                            "delete group by id failed! {e}"
-                        )))
-                    }
-                };
-            }
+                ProviderStoreError::StoreError(e) => {
+                    Err(Error::internal_error(format!(
+                        "delete group by id failed! {e}"
+                    )))
+                }
+            },
         }
     }
 }

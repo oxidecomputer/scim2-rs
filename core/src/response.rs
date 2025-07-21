@@ -4,8 +4,6 @@
 
 use super::*;
 
-use std::collections::BTreeMap;
-
 /// The generic response used to return a list of resources
 #[derive(Serialize, JsonSchema)]
 pub struct ListResponse<R> {
@@ -73,31 +71,31 @@ impl<R: Resource> ListResponse<R> {
     }
 }
 
+#[derive(Serialize, JsonSchema)]
+struct ResourceInner<R> {
+    #[serde(flatten)]
+    resource: R,
+    schemas: Vec<String>,
+}
+
 /// The generic response used to return a single resource
 #[derive(Serialize, JsonSchema)]
-pub struct SingleResourceResponse {
+pub struct SingleResourceResponse<R> {
     #[serde(flatten)]
-    resource: BTreeMap<String, serde_json::value::Value>,
+    resource: ResourceInner<R>,
 
     meta: Meta,
 }
 
-impl SingleResourceResponse {
+impl<R: Resource> SingleResourceResponse<R> {
     pub fn from_resource<T>(
-        v: T,
+        resource: R,
         _query_params: Option<QueryParams>,
     ) -> Result<Self, Error>
     where
         T: Resource + Serialize,
     {
-        let serialized = serde_json::to_string(&v)
-            .map_err(|e| Error::internal_error(format!("{e}")))?;
-
-        let mut resource: BTreeMap<String, serde_json::value::Value> =
-            serde_json::from_str(&serialized)
-                .map_err(|e| Error::internal_error(format!("{e}")))?;
-
-        resource.insert(String::from("schemas"), [T::schema()].into());
+        let resource = ResourceInner { resource, schemas: vec![T::schema()] };
 
         Ok(SingleResourceResponse {
             resource,
