@@ -50,6 +50,66 @@ pub async fn get_resource_types(
 
 #[endpoint {
     method = GET,
+    path = "/v2/ResourceTypes/User"
+}]
+pub async fn get_resource_type_user(
+    rqctx: RequestContext<Arc<ServerContext>>,
+) -> Result<Response<Body>, HttpError> {
+    let _apictx = rqctx.context();
+
+    Ok(Response::builder()
+        .status(200)
+        .header("Content-Type", "application/json")
+        .body(
+            serde_json::json!({
+              "schemas": [
+                "urn:ietf:params:scim:api:messages:2.0:ResourceType"
+              ],
+              "id": "User",
+              "name": "User",
+              "description": "User Account",
+              "endpoint": "/Users",
+              "schema": "urn:ietf:params:scim:schemas:core:2.0:User"
+            }
+            )
+            .to_string()
+            .into(),
+        )
+        .unwrap())
+}
+
+#[endpoint {
+    method = GET,
+    path = "/v2/ResourceTypes/Group"
+}]
+pub async fn get_resource_type_group(
+    rqctx: RequestContext<Arc<ServerContext>>,
+) -> Result<Response<Body>, HttpError> {
+    let _apictx = rqctx.context();
+
+    Ok(Response::builder()
+        .status(200)
+        .header("Content-Type", "application/json")
+        .body(
+            serde_json::json!({
+              "schemas": [
+                "urn:ietf:params:scim:api:messages:2.0:ResourceType"
+              ],
+              "id": "Group",
+              "name": "Group",
+              "description": "Group",
+              "endpoint": "/Groups",
+              "schema": "urn:ietf:params:scim:schemas:core:2.0:Group"
+            }
+            )
+            .to_string()
+            .into(),
+        )
+        .unwrap())
+}
+
+#[endpoint {
+    method = GET,
     path = "/v2/Schemas"
 }]
 pub async fn get_schemas(

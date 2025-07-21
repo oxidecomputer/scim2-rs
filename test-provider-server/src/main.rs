@@ -48,6 +48,8 @@ fn register_endpoints(
     api_description.register(groups::delete_group)?;
 
     api_description.register(server::get_resource_types)?;
+    api_description.register(server::get_resource_type_user)?;
+    api_description.register(server::get_resource_type_group)?;
     api_description.register(server::get_schemas)?;
     api_description.register(server::get_service_provider_config)?;
 
