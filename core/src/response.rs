@@ -95,7 +95,7 @@ pub struct SingleResourceResponse {
 impl SingleResourceResponse {
     pub fn from_resource<T>(
         v: T,
-        _query_params: QueryParams,
+        _query_params: Option<QueryParams>,
     ) -> Result<Self, Error>
     where
         T: Resource + Serialize,

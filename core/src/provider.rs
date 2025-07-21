@@ -63,14 +63,25 @@ impl<T: ProviderStore> Provider<T> {
             return Err(Error::not_found(user_id));
         };
 
-        SingleResourceResponse::from_resource(user, query_params)
+        SingleResourceResponse::from_resource(user, Some(query_params))
     }
 
     pub async fn create_user(
         &self,
-        _request: CreateUserRequest,
+        request: CreateUserRequest,
     ) -> Result<SingleResourceResponse, Error> {
-        unimplemented!()
+        match self.store.create_user(request).await {
+            Ok(user) => {
+                SingleResourceResponse::from_resource(user, None)
+            }
+
+            Err(e) => match e {
+                ProviderStoreError::Scim(e) => Err(e),
+                ProviderStoreError::StoreError(e) => Err(
+                    Error::internal_error(format!("create user failed! {e}")),
+                ),
+            }
+        }
     }
 
     pub async fn replace_user(
@@ -136,7 +147,7 @@ impl<T: ProviderStore> Provider<T> {
             return Err(Error::not_found(group_id));
         };
 
-        SingleResourceResponse::from_resource(group, query_params)
+        SingleResourceResponse::from_resource(group, Some(query_params))
     }
 
     pub async fn create_group(
