@@ -77,5 +77,65 @@ impl<T: ProviderStore> Provider<T> {
         unimplemented!()
     }
 
-    // TODO: groups
+    pub async fn list_groups(&self, query_params: QueryParams) -> Result<ListResponse, Error> {
+        let groups: Vec<Group> = match self.store.list_groups(query_params.clone()).await {
+            Ok(groups) => groups,
+            Err(e) => {
+                return match e {
+                    ProviderStoreError::Scim(e) => Err(e),
+
+                    ProviderStoreError::StoreError(e) => {
+                        Err(Error::internal_error(format!("list groups failed! {e}")))
+                    }
+                };
+            }
+        };
+
+        ListResponse::from_resources(groups, query_params)
+    }
+
+    pub async fn get_group_by_id(
+        &self,
+        query_params: QueryParams,
+        group_id: String,
+    ) -> Result<SingleResourceResponse, Error> {
+        let group = match self.store.get_group_by_id(group_id.clone()).await {
+            Ok(group) => group,
+
+            Err(e) => {
+                return match e {
+                    ProviderStoreError::Scim(e) => Err(e),
+
+                    ProviderStoreError::StoreError(e) => Err(Error::internal_error(format!(
+                        "get group by id failed! {e}"
+                    ))),
+                };
+            }
+        };
+
+        let Some(group) = group else {
+            return Err(Error::not_found(group_id));
+        };
+
+        SingleResourceResponse::from_resource(group, query_params)
+    }
+
+    pub async fn create_group(
+        &self,
+        _request: CreateGroupRequest,
+    ) -> Result<SingleResourceResponse, Error> {
+        unimplemented!()
+    }
+
+    pub async fn replace_group(
+        &self,
+        _group_id: String,
+        _request: CreateGroupRequest,
+    ) -> Result<SingleResourceResponse, Error> {
+        unimplemented!()
+    }
+
+    pub async fn delete_group(&self, _group_id: String) -> Result<SingleResourceResponse, Error> {
+        unimplemented!()
+    }
 }

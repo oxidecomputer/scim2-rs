@@ -9,15 +9,24 @@ use super::*;
     path = "/v2/Groups"
 }]
 pub async fn list_groups(
-    _rqctx: RequestContext<Arc<ServerContext>>,
-    _query_params: Query<scim2_rs::QueryParams>,
+    rqctx: RequestContext<Arc<ServerContext>>,
+    query_params: Query<scim2_rs::QueryParams>,
 ) -> Result<Response<Body>, HttpError> {
-    unimplemented!()
+    let apictx = rqctx.context();
+    let query_params = query_params.into_inner();
+
+    let result: Result<Response<Body>, http::Error> =
+        match apictx.provider.list_groups(query_params).await {
+            Ok(response) => response.to_http_response(),
+            Err(error) => error.to_http_response(),
+        };
+
+    result.map_err(|e| HttpError::from(e))
 }
 
 #[derive(Deserialize, JsonSchema)]
 struct GetGroupPathParam {
-    _group_id: String,
+    group_id: String,
 }
 
 #[endpoint {
@@ -25,11 +34,24 @@ struct GetGroupPathParam {
     path = "/v2/Groups/{group_id}"
 }]
 pub async fn get_group(
-    _rqctx: RequestContext<Arc<ServerContext>>,
-    _path_param: Path<GetGroupPathParam>,
-    _query_params: Query<scim2_rs::QueryParams>,
+    rqctx: RequestContext<Arc<ServerContext>>,
+    path_param: Path<GetGroupPathParam>,
+    query_params: Query<scim2_rs::QueryParams>,
 ) -> Result<Response<Body>, HttpError> {
-    unimplemented!()
+    let apictx = rqctx.context();
+    let query_params = query_params.into_inner();
+    let path_param = path_param.into_inner();
+
+    let result: Result<Response<Body>, http::Error> = match apictx
+        .provider
+        .get_group_by_id(query_params, path_param.group_id)
+        .await
+    {
+        Ok(response) => response.to_http_response(),
+        Err(error) => error.to_http_response(),
+    };
+
+    result.map_err(|e| HttpError::from(e))
 }
 
 #[endpoint {
@@ -37,15 +59,24 @@ pub async fn get_group(
     path = "/v2/Groups",
 }]
 pub async fn create_group(
-    _rqctx: RequestContext<Arc<ServerContext>>,
-    _new_group: TypedBody<scim2_rs::CreateGroupRequest>,
+    rqctx: RequestContext<Arc<ServerContext>>,
+    body: TypedBody<scim2_rs::CreateGroupRequest>,
 ) -> Result<Response<Body>, HttpError> {
-    unimplemented!()
+    let apictx = rqctx.context();
+    let request = body.into_inner();
+
+    let result: Result<Response<Body>, http::Error> =
+        match apictx.provider.create_group(request).await {
+            Ok(response) => response.to_http_response(),
+            Err(error) => error.to_http_response(),
+        };
+
+    result.map_err(|e| HttpError::from(e))
 }
 
 #[derive(Deserialize, JsonSchema)]
 pub struct PutGroupPathParam {
-    _group_id: String,
+    group_id: String,
 }
 
 #[endpoint {
@@ -53,16 +84,29 @@ pub struct PutGroupPathParam {
     path = "/v2/Groups/{group_id}"
 }]
 pub async fn put_group(
-    _rqctx: RequestContext<Arc<ServerContext>>,
-    _path_param: Path<PutGroupPathParam>,
-    _updated_group: TypedBody<scim2_rs::CreateGroupRequest>,
+    rqctx: RequestContext<Arc<ServerContext>>,
+    path_param: Path<PutGroupPathParam>,
+    body: TypedBody<scim2_rs::CreateGroupRequest>,
 ) -> Result<Response<Body>, HttpError> {
-    unimplemented!()
+    let apictx = rqctx.context();
+    let path_param = path_param.into_inner();
+    let request = body.into_inner();
+
+    let result: Result<Response<Body>, http::Error> = match apictx
+        .provider
+        .replace_group(path_param.group_id, request)
+        .await
+    {
+        Ok(response) => response.to_http_response(),
+        Err(error) => error.to_http_response(),
+    };
+
+    result.map_err(|e| HttpError::from(e))
 }
 
 #[derive(Deserialize, JsonSchema)]
 pub struct DeleteGroupPathParam {
-    _group_id: String,
+    group_id: String,
 }
 
 #[endpoint {
@@ -70,8 +114,17 @@ pub struct DeleteGroupPathParam {
     path = "/v2/Groups/{group_id}"
 }]
 pub async fn delete_group(
-    _rqctx: RequestContext<Arc<ServerContext>>,
-    _path_param: Path<DeleteGroupPathParam>,
+    rqctx: RequestContext<Arc<ServerContext>>,
+    path_param: Path<DeleteGroupPathParam>,
 ) -> Result<Response<Body>, HttpError> {
-    unimplemented!()
+    let apictx = rqctx.context();
+    let path_param = path_param.into_inner();
+
+    let result: Result<Response<Body>, http::Error> =
+        match apictx.provider.delete_group(path_param.group_id).await {
+            Ok(response) => response.to_http_response(),
+            Err(error) => error.to_http_response(),
+        };
+
+    result.map_err(|e| HttpError::from(e))
 }

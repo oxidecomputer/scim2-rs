@@ -10,12 +10,14 @@ use uuid::Uuid;
 /// A non-optimized provider store implementation for use with tests
 pub struct InMemoryProviderStore {
     users: Mutex<Vec<User>>,
+    groups: Mutex<Vec<Group>>,
 }
 
 impl InMemoryProviderStore {
     pub fn new() -> Self {
         let store = Self {
             users: Mutex::new(vec![]),
+            groups: Mutex::new(vec![]),
         };
 
         store
@@ -74,5 +76,57 @@ impl ProviderStore for InMemoryProviderStore {
     ) -> Result<Vec<User>, ProviderStoreError> {
         let users = self.users.lock().unwrap();
         Ok(users.clone())
+    }
+
+    async fn get_group_by_id(&self, group_id: String) -> Result<Option<Group>, ProviderStoreError> {
+        let groups = self.groups.lock().unwrap();
+        Ok(groups
+            .iter()
+            .filter(|group| group.id == group_id)
+            .next()
+            .cloned())
+    }
+
+    async fn get_group_by_displayname(
+        &self,
+        display_name: String,
+    ) -> Result<Option<Group>, ProviderStoreError> {
+        let groups = self.groups.lock().unwrap();
+        Ok(groups
+            .iter()
+            .filter(|group| group.display_name == display_name)
+            .next()
+            .cloned())
+    }
+
+    async fn create_group(
+        &self,
+        group_request: CreateGroupRequest,
+    ) -> Result<Group, ProviderStoreError> {
+        if self
+            .get_group_by_displayname(group_request.display_name.clone())
+            .await?
+            .is_some()
+        {
+            return Err(Error::conflict(group_request.display_name).into());
+        }
+
+        let new_group = Group {
+            id: Uuid::new_v4().to_string(),
+            display_name: group_request.display_name,
+        };
+
+        let mut groups = self.groups.lock().unwrap();
+        groups.push(new_group.clone());
+
+        Ok(new_group)
+    }
+
+    async fn list_groups(
+        &self,
+        _query_params: QueryParams,
+    ) -> Result<Vec<Group>, ProviderStoreError> {
+        let groups = self.groups.lock().unwrap();
+        Ok(groups.clone())
     }
 }

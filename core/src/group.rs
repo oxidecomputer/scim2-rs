@@ -5,10 +5,18 @@
 use super::*;
 
 #[derive(Deserialize, JsonSchema)]
-pub struct CreateGroupRequest {}
+pub struct CreateGroupRequest {
+    #[serde(rename = "displayName")]
+    pub display_name: String,
+}
 
-#[derive(Deserialize, JsonSchema)]
-pub struct Group {}
+#[derive(Serialize, Deserialize, JsonSchema, Clone)]
+pub struct Group {
+    pub id: String,
+
+    #[serde(rename = "displayName")]
+    pub display_name: String,
+}
 
 impl Resource for Group {
     fn schema() -> String {

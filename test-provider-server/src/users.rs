@@ -73,6 +73,7 @@ pub async fn create_user(
 
     result.map_err(|e| HttpError::from(e))
 }
+
 #[derive(Deserialize, JsonSchema)]
 pub struct PutUserPathParam {
     user_id: String,
