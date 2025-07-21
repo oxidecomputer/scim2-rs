@@ -15,10 +15,7 @@ pub struct InMemoryProviderStore {
 
 impl InMemoryProviderStore {
     pub fn new() -> Self {
-        let store =
-            Self { users: Mutex::new(vec![]), groups: Mutex::new(vec![]) };
-
-        store
+        Self { users: Mutex::new(vec![]), groups: Mutex::new(vec![]) }
     }
 }
 
@@ -29,7 +26,7 @@ impl ProviderStore for InMemoryProviderStore {
         user_id: String,
     ) -> Result<Option<User>, ProviderStoreError> {
         let users = self.users.lock().unwrap();
-        Ok(users.iter().filter(|user| user.id == user_id).next().cloned())
+        Ok(users.iter().find(|user| user.id == user_id).cloned())
     }
 
     async fn get_user_by_username(
@@ -37,7 +34,7 @@ impl ProviderStore for InMemoryProviderStore {
         user_name: String,
     ) -> Result<Option<User>, ProviderStoreError> {
         let users = self.users.lock().unwrap();
-        Ok(users.iter().filter(|user| user.name == user_name).next().cloned())
+        Ok(users.iter().find(|user| user.name == user_name).cloned())
     }
 
     async fn create_user(
@@ -71,7 +68,7 @@ impl ProviderStore for InMemoryProviderStore {
         group_id: String,
     ) -> Result<Option<Group>, ProviderStoreError> {
         let groups = self.groups.lock().unwrap();
-        Ok(groups.iter().filter(|group| group.id == group_id).next().cloned())
+        Ok(groups.iter().find(|group| group.id == group_id).cloned())
     }
 
     async fn get_group_by_displayname(
@@ -81,8 +78,7 @@ impl ProviderStore for InMemoryProviderStore {
         let groups = self.groups.lock().unwrap();
         Ok(groups
             .iter()
-            .filter(|group| group.display_name == display_name)
-            .next()
+            .find(|group| group.display_name == display_name)
             .cloned())
     }
 
