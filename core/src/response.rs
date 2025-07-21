@@ -5,7 +5,6 @@
 use super::*;
 
 use std::collections::BTreeMap;
-use std::collections::BTreeSet;
 
 /// The generic response used to return a list of resources
 #[derive(Serialize, JsonSchema)]
@@ -36,10 +35,9 @@ impl ListResponse {
     where
         T: Resource + Serialize,
     {
-        let schemas: BTreeSet<String> =
-            v.iter().map(|_| <T as Resource>::schema()).collect();
-
-        let schemas: Vec<String> = schemas.into_iter().collect();
+        let schemas = vec![
+            String::from("urn:ietf:params:scim:api:messages:2.0:ListResponse"),
+        ];
 
         let serialized = serde_json::to_string(&v)
             .map_err(|e| Error::internal_error(format!("{e}")))?;
