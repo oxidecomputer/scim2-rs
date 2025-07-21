@@ -8,7 +8,7 @@ use std::collections::BTreeMap;
 
 /// The generic response used to return a list of resources
 #[derive(Serialize, JsonSchema)]
-pub struct ListResponse {
+pub struct ListResponse<R> {
     pub schemas: Vec<String>,
 
     #[serde(rename = "totalResults")]
@@ -23,25 +23,17 @@ pub struct ListResponse {
     pub items_per_page: Option<usize>,
 
     #[serde(rename = "Resources")]
-    pub resources: Vec<BTreeMap<String, serde_json::value::Value>>,
+    pub resources: Vec<R>,
 }
 
-impl ListResponse {
-    pub fn from_resources<T>(
-        v: Vec<T>,
+impl<R: Resource> ListResponse<R> {
+    pub fn from_resources(
+        resources: Vec<R>,
         _query_params: QueryParams,
-    ) -> Result<Self, Error>
-    where
-        T: Resource + Serialize,
-    {
+    ) -> Result<Self, Error> {
         let schemas = vec![String::from(
             "urn:ietf:params:scim:api:messages:2.0:ListResponse",
         )];
-
-        let serialized = serde_json::to_string(&v)
-            .map_err(|e| Error::internal_error(format!("{e}")))?;
-        let resources = serde_json::from_str(&serialized)
-            .map_err(|e| Error::internal_error(format!("{e}")))?;
 
         // TODO: filter by attributes
         // pagination should have happened before this, but fill in start_index
@@ -49,7 +41,7 @@ impl ListResponse {
 
         Ok(ListResponse {
             schemas,
-            total_results: v.len(),
+            total_results: resources.len(),
             start_index: None,
             items_per_page: None,
             resources,

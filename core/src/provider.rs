@@ -18,7 +18,7 @@ impl<T: ProviderStore> Provider<T> {
     pub async fn list_users(
         &self,
         query_params: QueryParams,
-    ) -> Result<ListResponse, Error> {
+    ) -> Result<ListResponse<User>, Error> {
         let users: Vec<User> =
             match self.store.list_users(query_params.clone()).await {
                 Ok(users) => users,
@@ -97,24 +97,22 @@ impl<T: ProviderStore> Provider<T> {
         match self.store.delete_user_by_id(user_id.clone()).await {
             Ok(_) => deleted_http_response(),
 
-            Err(e) => {
-                return match e {
-                    ProviderStoreError::Scim(e) => Err(e),
+            Err(e) => match e {
+                ProviderStoreError::Scim(e) => Err(e),
 
-                    ProviderStoreError::StoreError(e) => {
-                        Err(Error::internal_error(format!(
-                            "delete user by id failed! {e}"
-                        )))
-                    }
-                };
-            }
+                ProviderStoreError::StoreError(e) => {
+                    Err(Error::internal_error(format!(
+                        "delete user by id failed! {e}"
+                    )))
+                }
+            },
         }
     }
 
     pub async fn list_groups(
         &self,
         query_params: QueryParams,
-    ) -> Result<ListResponse, Error> {
+    ) -> Result<ListResponse<Group>, Error> {
         let groups: Vec<Group> =
             match self.store.list_groups(query_params.clone()).await {
                 Ok(groups) => groups,
