@@ -150,9 +150,18 @@ impl<T: ProviderStore> Provider<T> {
 
     pub async fn create_group(
         &self,
-        _request: CreateGroupRequest,
+        request: CreateGroupRequest,
     ) -> Result<SingleResourceResponse, Error> {
-        unimplemented!()
+        match self.store.create_group(request).await {
+            Ok(user) => SingleResourceResponse::from_resource(user, None),
+
+            Err(e) => match e {
+                ProviderStoreError::Scim(e) => Err(e),
+                ProviderStoreError::StoreError(e) => Err(
+                    Error::internal_error(format!("create group failed! {e}")),
+                ),
+            },
+        }
     }
 
     pub async fn replace_group(
