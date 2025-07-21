@@ -47,7 +47,7 @@ pub async fn get_group(
         .get_group_by_id(query_params, path_param.group_id)
         .await
     {
-        Ok(response) => response.to_http_response(),
+        Ok(response) => response.to_http_response(StatusCode::OK),
         Err(error) => error.to_http_response(),
     };
 
@@ -67,7 +67,7 @@ pub async fn create_group(
 
     let result: Result<Response<Body>, http::Error> =
         match apictx.provider.create_group(request).await {
-            Ok(response) => response.to_http_response(),
+            Ok(response) => response.to_http_response(StatusCode::CREATED),
             Err(error) => error.to_http_response(),
         };
 
@@ -95,7 +95,7 @@ pub async fn put_group(
     let result: Result<Response<Body>, http::Error> =
         match apictx.provider.replace_group(path_param.group_id, request).await
         {
-            Ok(response) => response.to_http_response(),
+            Ok(response) => response.to_http_response(StatusCode::OK),
             Err(error) => error.to_http_response(),
         };
 
@@ -120,7 +120,7 @@ pub async fn delete_group(
 
     let result: Result<Response<Body>, http::Error> =
         match apictx.provider.delete_group(path_param.group_id).await {
-            Ok(response) => response.to_http_response(),
+            Ok(response) => response.to_http_response(StatusCode::NO_CONTENT),
             Err(error) => error.to_http_response(),
         };
 

@@ -14,6 +14,7 @@ use dropshot::RequestContext;
 use dropshot::TypedBody;
 use dropshot::endpoint;
 use http::Response;
+use http::StatusCode;
 use schemars::JsonSchema;
 use scim2_rs::ProviderStore;
 use serde::Deserialize;

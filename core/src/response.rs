@@ -112,12 +112,13 @@ impl SingleResourceResponse {
         Ok(SingleResourceResponse { resource })
     }
 
-    // TODO pull this out into generic function, it's duplicated from
-    // ListResponse
-    pub fn to_http_response(self) -> Result<Response<Body>, http::Error> {
+    pub fn to_http_response(
+        self,
+        status_code: StatusCode,
+    ) -> Result<Response<Body>, http::Error> {
         match serde_json::to_string(&self) {
             Ok(serialized) => Response::builder()
-                .status(200)
+                .status(status_code)
                 .header("Content-Type", "application/json")
                 .body(serialized.into()),
 
@@ -200,7 +201,6 @@ impl Error {
         Self::new(500, None, detail)
     }
 
-    // TODO also should use generic function
     pub fn to_http_response(self) -> Result<Response<Body>, http::Error> {
         match serde_json::to_string(&self) {
             Ok(serialized) => Response::builder()

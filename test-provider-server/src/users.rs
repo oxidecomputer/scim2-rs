@@ -47,7 +47,7 @@ pub async fn get_user(
         .get_user_by_id(query_params, path_param.user_id)
         .await
     {
-        Ok(response) => response.to_http_response(),
+        Ok(response) => response.to_http_response(StatusCode::OK),
         Err(error) => error.to_http_response(),
     };
 
@@ -67,7 +67,7 @@ pub async fn create_user(
 
     let result: Result<Response<Body>, http::Error> =
         match apictx.provider.create_user(request).await {
-            Ok(response) => response.to_http_response(),
+            Ok(response) => response.to_http_response(StatusCode::CREATED),
             Err(error) => error.to_http_response(),
         };
 
@@ -94,7 +94,7 @@ pub async fn put_user(
 
     let result: Result<Response<Body>, http::Error> =
         match apictx.provider.replace_user(path_param.user_id, request).await {
-            Ok(response) => response.to_http_response(),
+            Ok(response) => response.to_http_response(StatusCode::OK),
             Err(error) => error.to_http_response(),
         };
 
@@ -119,7 +119,7 @@ pub async fn delete_user(
 
     let result: Result<Response<Body>, http::Error> =
         match apictx.provider.delete_user(path_param.user_id).await {
-            Ok(response) => response.to_http_response(),
+            Ok(response) => response.to_http_response(StatusCode::NO_CONTENT),
             Err(error) => error.to_http_response(),
         };
 
