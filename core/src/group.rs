@@ -21,6 +21,8 @@ pub struct Group {
     pub display_name: String,
 
     /// An identifier for the resource as defined by the provisioning client
+    // This is an OPTIONAL attribute, so skip serializing it if it's null.
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub external_id: Option<String>,
 }
 
