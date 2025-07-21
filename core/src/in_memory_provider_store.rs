@@ -107,6 +107,7 @@ impl ProviderStore for InMemoryProviderStore {
         let new_group = Group {
             id: Uuid::new_v4().to_string(),
             display_name: group_request.display_name,
+            external_id: group_request.external_id,
         };
 
         let mut groups = self.groups.lock().unwrap();

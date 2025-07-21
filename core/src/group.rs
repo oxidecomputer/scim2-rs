@@ -5,17 +5,23 @@
 use super::*;
 
 #[derive(Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
 pub struct CreateGroupRequest {
-    #[serde(rename = "displayName")]
     pub display_name: String,
+
+    /// An identifier for the resource as defined by the provisioning client
+    pub external_id: Option<String>,
 }
 
 #[derive(Serialize, Deserialize, JsonSchema, Clone)]
+#[serde(rename_all = "camelCase")]
 pub struct Group {
     pub id: String,
 
-    #[serde(rename = "displayName")]
     pub display_name: String,
+
+    /// An identifier for the resource as defined by the provisioning client
+    pub external_id: Option<String>,
 }
 
 impl Resource for Group {
