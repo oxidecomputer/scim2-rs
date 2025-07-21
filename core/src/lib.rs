@@ -12,6 +12,7 @@ use serde::Serialize;
 
 mod group;
 mod in_memory_provider_store;
+mod meta;
 mod provider;
 mod provider_store;
 mod query_params;
@@ -21,6 +22,7 @@ mod user;
 
 pub use group::*;
 pub use in_memory_provider_store::*;
+pub use meta::*;
 pub use provider::*;
 pub use provider_store::*;
 pub use query_params::*;

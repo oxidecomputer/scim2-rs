@@ -8,7 +8,6 @@ use super::*;
 #[serde(rename_all = "camelCase")]
 pub struct Meta {
     pub resource_type: String,
-
     // TODO:
     // - created
     // - lastModified

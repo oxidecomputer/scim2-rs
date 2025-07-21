@@ -24,7 +24,6 @@ pub struct ListResponse {
 
     #[serde(rename = "Resources")]
     pub resources: Vec<BTreeMap<String, serde_json::value::Value>>,
-    // TODO: meta
 }
 
 impl ListResponse {
@@ -87,7 +86,8 @@ impl ListResponse {
 pub struct SingleResourceResponse {
     #[serde(flatten)]
     resource: BTreeMap<String, serde_json::value::Value>,
-    // TODO: meta
+
+    meta: Meta,
 }
 
 impl SingleResourceResponse {
@@ -107,7 +107,10 @@ impl SingleResourceResponse {
 
         resource.insert(String::from("schema"), T::schema().into());
 
-        Ok(SingleResourceResponse { resource })
+        Ok(SingleResourceResponse {
+            resource,
+            meta: Meta { resource_type: T::resource_type() },
+        })
     }
 
     pub fn to_http_response(
