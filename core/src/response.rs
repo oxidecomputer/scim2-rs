@@ -105,7 +105,7 @@ impl SingleResourceResponse {
             serde_json::from_str(&serialized)
                 .map_err(|e| Error::internal_error(format!("{e}")))?;
 
-        resource.insert(String::from("schema"), T::schema().into());
+        resource.insert(String::from("schemas"), [T::schema()].into());
 
         Ok(SingleResourceResponse {
             resource,
