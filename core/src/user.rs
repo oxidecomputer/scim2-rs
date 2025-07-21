@@ -5,17 +5,29 @@
 use super::*;
 
 #[derive(Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
 pub struct CreateUserRequest {
     #[serde(rename = "userName")]
     pub name: String,
+
+    pub active: Option<bool>,
+
+    /// An identifier for the resource as defined by the provisioning client
+    pub external_id: Option<String>,
 }
 
 #[derive(Serialize, Deserialize, JsonSchema, Clone)]
+#[serde(rename_all = "camelCase")]
 pub struct User {
     pub id: String,
 
     #[serde(rename = "userName")]
     pub name: String,
+
+    pub active: bool,
+
+    /// An identifier for the resource as defined by the provisioning client
+    pub external_id: Option<String>,
 }
 
 impl Resource for User {

@@ -52,8 +52,12 @@ impl ProviderStore for InMemoryProviderStore {
             return Err(Error::conflict(user_request.name).into());
         }
 
-        let new_user =
-            User { id: Uuid::new_v4().to_string(), name: user_request.name };
+        let new_user = User {
+            id: Uuid::new_v4().to_string(),
+            name: user_request.name,
+            external_id: user_request.external_id,
+            active: user_request.active.unwrap_or(true),
+        };
 
         let mut users = self.users.lock().unwrap();
         users.push(new_user.clone());

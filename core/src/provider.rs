@@ -71,16 +71,14 @@ impl<T: ProviderStore> Provider<T> {
         request: CreateUserRequest,
     ) -> Result<SingleResourceResponse, Error> {
         match self.store.create_user(request).await {
-            Ok(user) => {
-                SingleResourceResponse::from_resource(user, None)
-            }
+            Ok(user) => SingleResourceResponse::from_resource(user, None),
 
             Err(e) => match e {
                 ProviderStoreError::Scim(e) => Err(e),
                 ProviderStoreError::StoreError(e) => Err(
                     Error::internal_error(format!("create user failed! {e}")),
                 ),
-            }
+            },
         }
     }
 

@@ -87,6 +87,8 @@ async fn main() -> anyhow::Result<()> {
     store
         .create_user(scim2_rs::CreateUserRequest {
             name: String::from("dschrute@example.com"),
+            external_id: None,
+            active: Some(true),
         })
         .await
         .unwrap();

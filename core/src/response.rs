@@ -35,9 +35,9 @@ impl ListResponse {
     where
         T: Resource + Serialize,
     {
-        let schemas = vec![
-            String::from("urn:ietf:params:scim:api:messages:2.0:ListResponse"),
-        ];
+        let schemas = vec![String::from(
+            "urn:ietf:params:scim:api:messages:2.0:ListResponse",
+        )];
 
         let serialized = serde_json::to_string(&v)
             .map_err(|e| Error::internal_error(format!("{e}")))?;
