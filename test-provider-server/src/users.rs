@@ -21,7 +21,7 @@ pub async fn list_users(
             Err(error) => error.to_http_response(),
         };
 
-    result.map_err(|e| HttpError::from(e))
+    result.map_err(HttpError::from)
 }
 
 #[derive(Deserialize, JsonSchema)]
@@ -51,7 +51,7 @@ pub async fn get_user(
         Err(error) => error.to_http_response(),
     };
 
-    result.map_err(|e| HttpError::from(e))
+    result.map_err(HttpError::from)
 }
 
 #[endpoint {
@@ -71,7 +71,7 @@ pub async fn create_user(
             Err(error) => error.to_http_response(),
         };
 
-    result.map_err(|e| HttpError::from(e))
+    result.map_err(HttpError::from)
 }
 
 #[derive(Deserialize, JsonSchema)]
@@ -98,7 +98,7 @@ pub async fn put_user(
             Err(error) => error.to_http_response(),
         };
 
-    result.map_err(|e| HttpError::from(e))
+    result.map_err(HttpError::from)
 }
 
 #[derive(Deserialize, JsonSchema)]
@@ -123,5 +123,5 @@ pub async fn delete_user(
             Err(error) => error.to_http_response(),
         };
 
-    result.map_err(|e| HttpError::from(e))
+    result.map_err(HttpError::from)
 }

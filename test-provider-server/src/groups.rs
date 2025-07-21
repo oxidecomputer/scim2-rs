@@ -21,7 +21,7 @@ pub async fn list_groups(
             Err(error) => error.to_http_response(),
         };
 
-    result.map_err(|e| HttpError::from(e))
+    result.map_err(HttpError::from)
 }
 
 #[derive(Deserialize, JsonSchema)]
@@ -51,7 +51,7 @@ pub async fn get_group(
         Err(error) => error.to_http_response(),
     };
 
-    result.map_err(|e| HttpError::from(e))
+    result.map_err(HttpError::from)
 }
 
 #[endpoint {
@@ -71,7 +71,7 @@ pub async fn create_group(
             Err(error) => error.to_http_response(),
         };
 
-    result.map_err(|e| HttpError::from(e))
+    result.map_err(HttpError::from)
 }
 
 #[derive(Deserialize, JsonSchema)]
@@ -99,7 +99,7 @@ pub async fn put_group(
             Err(error) => error.to_http_response(),
         };
 
-    result.map_err(|e| HttpError::from(e))
+    result.map_err(HttpError::from)
 }
 
 #[derive(Deserialize, JsonSchema)]
@@ -124,5 +124,5 @@ pub async fn delete_group(
             Err(error) => error.to_http_response(),
         };
 
-    result.map_err(|e| HttpError::from(e))
+    result.map_err(HttpError::from)
 }

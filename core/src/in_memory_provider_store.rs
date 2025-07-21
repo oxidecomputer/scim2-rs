@@ -13,6 +13,12 @@ pub struct InMemoryProviderStore {
     groups: Mutex<Vec<Group>>,
 }
 
+impl Default for InMemoryProviderStore {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl InMemoryProviderStore {
     pub fn new() -> Self {
         Self { users: Mutex::new(vec![]), groups: Mutex::new(vec![]) }
