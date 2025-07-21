@@ -226,3 +226,11 @@ impl Error {
         }
     }
 }
+
+pub fn deleted_http_response() -> Result<Response<Body>, Error> {
+    Response::builder()
+        .status(StatusCode::NO_CONTENT)
+        .header("Content-Type", "application/json")
+        .body(Body::empty())
+        .map_err(|e| Error::internal_error(format!("{e}")))
+}

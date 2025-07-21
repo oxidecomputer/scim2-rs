@@ -92,9 +92,23 @@ impl<T: ProviderStore> Provider<T> {
 
     pub async fn delete_user(
         &self,
-        _user_id: String,
-    ) -> Result<SingleResourceResponse, Error> {
-        unimplemented!()
+        user_id: String,
+    ) -> Result<Response<Body>, Error> {
+        match self.store.delete_user_by_id(user_id.clone()).await {
+            Ok(_) => deleted_http_response(),
+
+            Err(e) => {
+                return match e {
+                    ProviderStoreError::Scim(e) => Err(e),
+
+                    ProviderStoreError::StoreError(e) => {
+                        Err(Error::internal_error(format!(
+                            "delete user by id failed! {e}"
+                        )))
+                    }
+                };
+            }
+        }
     }
 
     pub async fn list_groups(
@@ -174,8 +188,22 @@ impl<T: ProviderStore> Provider<T> {
 
     pub async fn delete_group(
         &self,
-        _group_id: String,
-    ) -> Result<SingleResourceResponse, Error> {
-        unimplemented!()
+        group_id: String,
+    ) -> Result<Response<Body>, Error> {
+        match self.store.delete_group_by_id(group_id.clone()).await {
+            Ok(_) => deleted_http_response(),
+
+            Err(e) => {
+                return match e {
+                    ProviderStoreError::Scim(e) => Err(e),
+
+                    ProviderStoreError::StoreError(e) => {
+                        Err(Error::internal_error(format!(
+                            "delete group by id failed! {e}"
+                        )))
+                    }
+                };
+            }
+        }
     }
 }

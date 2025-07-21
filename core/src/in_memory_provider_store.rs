@@ -73,6 +73,15 @@ impl ProviderStore for InMemoryProviderStore {
         Ok(users.clone())
     }
 
+    async fn delete_user_by_id(
+        &self,
+        user_id: String,
+    ) -> Result<(), ProviderStoreError> {
+        let mut users = self.users.lock().unwrap();
+        users.retain(|user| user.id != user_id);
+        Ok(())
+    }
+
     async fn get_group_by_id(
         &self,
         group_id: String,
@@ -122,5 +131,14 @@ impl ProviderStore for InMemoryProviderStore {
     ) -> Result<Vec<Group>, ProviderStoreError> {
         let groups = self.groups.lock().unwrap();
         Ok(groups.clone())
+    }
+
+    async fn delete_group_by_id(
+        &self,
+        group_id: String,
+    ) -> Result<(), ProviderStoreError> {
+        let mut groups = self.groups.lock().unwrap();
+        groups.retain(|group| group.id != group_id);
+        Ok(())
     }
 }

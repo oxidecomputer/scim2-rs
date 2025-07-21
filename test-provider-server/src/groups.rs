@@ -120,7 +120,7 @@ pub async fn delete_group(
 
     let result: Result<Response<Body>, http::Error> =
         match apictx.provider.delete_group(path_param.group_id).await {
-            Ok(response) => response.to_http_response(StatusCode::NO_CONTENT),
+            Ok(response) => Ok(response),
             Err(error) => error.to_http_response(),
         };
 

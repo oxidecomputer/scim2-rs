@@ -27,6 +27,11 @@ pub trait ProviderStore: Sync {
         query_params: QueryParams,
     ) -> Result<Vec<User>, ProviderStoreError>;
 
+    async fn delete_user_by_id(
+        &self,
+        user_id: String,
+    ) -> Result<(), ProviderStoreError>;
+
     async fn get_group_by_id(
         &self,
         group_id: String,
@@ -46,6 +51,11 @@ pub trait ProviderStore: Sync {
         &self,
         query_params: QueryParams,
     ) -> Result<Vec<Group>, ProviderStoreError>;
+
+    async fn delete_group_by_id(
+        &self,
+        group_id: String,
+    ) -> Result<(), ProviderStoreError>;
 }
 
 /// The backing store for users and groups may throw its own error type, or it

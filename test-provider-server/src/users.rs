@@ -119,7 +119,7 @@ pub async fn delete_user(
 
     let result: Result<Response<Body>, http::Error> =
         match apictx.provider.delete_user(path_param.user_id).await {
-            Ok(response) => response.to_http_response(StatusCode::NO_CONTENT),
+            Ok(response) => Ok(response),
             Err(error) => error.to_http_response(),
         };
 
