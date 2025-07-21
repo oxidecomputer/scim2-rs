@@ -63,7 +63,7 @@ pub async fn get_resource_type_user(
         .body(
             serde_json::json!({
               "schemas": [
-                "urn:ietf:params:scim:api:messages:2.0:ResourceType"
+                "urn:ietf:params:scim:schemas:core:2.0:ResourceType"
               ],
               "id": "User",
               "name": "User",
@@ -93,7 +93,7 @@ pub async fn get_resource_type_group(
         .body(
             serde_json::json!({
               "schemas": [
-                "urn:ietf:params:scim:api:messages:2.0:ResourceType"
+                "urn:ietf:params:scim:schemas:core:2.0:ResourceType"
               ],
               "id": "Group",
               "name": "Group",
