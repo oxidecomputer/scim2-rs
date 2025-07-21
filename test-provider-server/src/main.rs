@@ -71,10 +71,8 @@ async fn main() -> anyhow::Result<()> {
 
     let log = slog::Logger::root(drain, slog::o!());
 
-    let config = ConfigDropshot {
-        bind_address: opt.bind_addr,
-        ..Default::default()
-    };
+    let config =
+        ConfigDropshot { bind_address: opt.bind_addr, ..Default::default() };
 
     let mut api_description = ApiDescription::<Arc<ServerContext>>::new();
 
@@ -92,11 +90,15 @@ async fn main() -> anyhow::Result<()> {
         .await
         .unwrap();
 
-    let ctx = Arc::new(ServerContext {
-        provider: scim2_rs::Provider::new(store),
-    });
+    let ctx =
+        Arc::new(ServerContext { provider: scim2_rs::Provider::new(store) });
 
-    let http_server = HttpServerStarter::new(&config, api_description, Arc::clone(&ctx), &log);
+    let http_server = HttpServerStarter::new(
+        &config,
+        api_description,
+        Arc::clone(&ctx),
+        &log,
+    );
 
     if let Err(e) = http_server {
         anyhow::bail!("Error from HttpServerStarter::new: {:?}", e);

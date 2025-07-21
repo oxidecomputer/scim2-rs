@@ -7,7 +7,10 @@ use super::*;
 /// The durable store for users and groups
 #[async_trait]
 pub trait ProviderStore: Sync {
-    async fn get_user_by_id(&self, user_id: String) -> Result<Option<User>, ProviderStoreError>;
+    async fn get_user_by_id(
+        &self,
+        user_id: String,
+    ) -> Result<Option<User>, ProviderStoreError>;
 
     async fn get_user_by_username(
         &self,
@@ -19,9 +22,15 @@ pub trait ProviderStore: Sync {
         user_request: CreateUserRequest,
     ) -> Result<User, ProviderStoreError>;
 
-    async fn list_users(&self, query_params: QueryParams) -> Result<Vec<User>, ProviderStoreError>;
+    async fn list_users(
+        &self,
+        query_params: QueryParams,
+    ) -> Result<Vec<User>, ProviderStoreError>;
 
-    async fn get_group_by_id(&self, group_id: String) -> Result<Option<Group>, ProviderStoreError>;
+    async fn get_group_by_id(
+        &self,
+        group_id: String,
+    ) -> Result<Option<Group>, ProviderStoreError>;
 
     async fn get_group_by_displayname(
         &self,

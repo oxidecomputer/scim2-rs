@@ -15,10 +15,8 @@ pub struct InMemoryProviderStore {
 
 impl InMemoryProviderStore {
     pub fn new() -> Self {
-        let store = Self {
-            users: Mutex::new(vec![]),
-            groups: Mutex::new(vec![]),
-        };
+        let store =
+            Self { users: Mutex::new(vec![]), groups: Mutex::new(vec![]) };
 
         store
     }
@@ -26,13 +24,12 @@ impl InMemoryProviderStore {
 
 #[async_trait]
 impl ProviderStore for InMemoryProviderStore {
-    async fn get_user_by_id(&self, user_id: String) -> Result<Option<User>, ProviderStoreError> {
+    async fn get_user_by_id(
+        &self,
+        user_id: String,
+    ) -> Result<Option<User>, ProviderStoreError> {
         let users = self.users.lock().unwrap();
-        Ok(users
-            .iter()
-            .filter(|user| user.id == user_id)
-            .next()
-            .cloned())
+        Ok(users.iter().filter(|user| user.id == user_id).next().cloned())
     }
 
     async fn get_user_by_username(
@@ -40,29 +37,20 @@ impl ProviderStore for InMemoryProviderStore {
         user_name: String,
     ) -> Result<Option<User>, ProviderStoreError> {
         let users = self.users.lock().unwrap();
-        Ok(users
-            .iter()
-            .filter(|user| user.name == user_name)
-            .next()
-            .cloned())
+        Ok(users.iter().filter(|user| user.name == user_name).next().cloned())
     }
 
     async fn create_user(
         &self,
         user_request: CreateUserRequest,
     ) -> Result<User, ProviderStoreError> {
-        if self
-            .get_user_by_username(user_request.name.clone())
-            .await?
-            .is_some()
+        if self.get_user_by_username(user_request.name.clone()).await?.is_some()
         {
             return Err(Error::conflict(user_request.name).into());
         }
 
-        let new_user = User {
-            id: Uuid::new_v4().to_string(),
-            name: user_request.name,
-        };
+        let new_user =
+            User { id: Uuid::new_v4().to_string(), name: user_request.name };
 
         let mut users = self.users.lock().unwrap();
         users.push(new_user.clone());
@@ -78,13 +66,12 @@ impl ProviderStore for InMemoryProviderStore {
         Ok(users.clone())
     }
 
-    async fn get_group_by_id(&self, group_id: String) -> Result<Option<Group>, ProviderStoreError> {
+    async fn get_group_by_id(
+        &self,
+        group_id: String,
+    ) -> Result<Option<Group>, ProviderStoreError> {
         let groups = self.groups.lock().unwrap();
-        Ok(groups
-            .iter()
-            .filter(|group| group.id == group_id)
-            .next()
-            .cloned())
+        Ok(groups.iter().filter(|group| group.id == group_id).next().cloned())
     }
 
     async fn get_group_by_displayname(

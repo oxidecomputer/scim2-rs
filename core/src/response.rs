@@ -29,18 +29,22 @@ pub struct ListResponse {
 }
 
 impl ListResponse {
-    pub fn from_resources<T>(v: Vec<T>, _query_params: QueryParams) -> Result<Self, Error>
+    pub fn from_resources<T>(
+        v: Vec<T>,
+        _query_params: QueryParams,
+    ) -> Result<Self, Error>
     where
         T: Resource + Serialize,
     {
-        let schemas: BTreeSet<String> = v.iter().map(|_| <T as Resource>::schema()).collect();
+        let schemas: BTreeSet<String> =
+            v.iter().map(|_| <T as Resource>::schema()).collect();
 
         let schemas: Vec<String> = schemas.into_iter().collect();
 
-        let serialized =
-            serde_json::to_string(&v).map_err(|e| Error::internal_error(format!("{e}")))?;
-        let resources =
-            serde_json::from_str(&serialized).map_err(|e| Error::internal_error(format!("{e}")))?;
+        let serialized = serde_json::to_string(&v)
+            .map_err(|e| Error::internal_error(format!("{e}")))?;
+        let resources = serde_json::from_str(&serialized)
+            .map_err(|e| Error::internal_error(format!("{e}")))?;
 
         // TODO: filter by attributes
         // pagination should have happened before this, but fill in start_index
@@ -89,15 +93,19 @@ pub struct SingleResourceResponse {
 }
 
 impl SingleResourceResponse {
-    pub fn from_resource<T>(v: T, _query_params: QueryParams) -> Result<Self, Error>
+    pub fn from_resource<T>(
+        v: T,
+        _query_params: QueryParams,
+    ) -> Result<Self, Error>
     where
         T: Resource + Serialize,
     {
-        let serialized =
-            serde_json::to_string(&v).map_err(|e| Error::internal_error(format!("{e}")))?;
+        let serialized = serde_json::to_string(&v)
+            .map_err(|e| Error::internal_error(format!("{e}")))?;
 
         let mut resource: BTreeMap<String, serde_json::value::Value> =
-            serde_json::from_str(&serialized).map_err(|e| Error::internal_error(format!("{e}")))?;
+            serde_json::from_str(&serialized)
+                .map_err(|e| Error::internal_error(format!("{e}")))?;
 
         resource.insert(String::from("schema"), T::schema().into());
 
@@ -157,9 +165,15 @@ pub struct Error {
 }
 
 impl Error {
-    pub fn new(status: u16, error_type: Option<ErrorType>, detail: String) -> Self {
+    pub fn new(
+        status: u16,
+        error_type: Option<ErrorType>,
+        detail: String,
+    ) -> Self {
         Self {
-            schemas: vec![String::from("urn:ietf:params:scim:api:messages:2.0:Error")],
+            schemas: vec![String::from(
+                "urn:ietf:params:scim:api:messages:2.0:Error",
+            )],
             status,
             error_type,
             detail,

@@ -92,14 +92,11 @@ pub async fn put_user(
     let path_param = path_param.into_inner();
     let request = body.into_inner();
 
-    let result: Result<Response<Body>, http::Error> = match apictx
-        .provider
-        .replace_user(path_param.user_id, request)
-        .await
-    {
-        Ok(response) => response.to_http_response(),
-        Err(error) => error.to_http_response(),
-    };
+    let result: Result<Response<Body>, http::Error> =
+        match apictx.provider.replace_user(path_param.user_id, request).await {
+            Ok(response) => response.to_http_response(),
+            Err(error) => error.to_http_response(),
+        };
 
     result.map_err(|e| HttpError::from(e))
 }

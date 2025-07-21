@@ -15,19 +15,25 @@ impl<T: ProviderStore> Provider<T> {
         Self { store }
     }
 
-    pub async fn list_users(&self, query_params: QueryParams) -> Result<ListResponse, Error> {
-        let users: Vec<User> = match self.store.list_users(query_params.clone()).await {
-            Ok(users) => users,
-            Err(e) => {
-                return match e {
-                    ProviderStoreError::Scim(e) => Err(e),
+    pub async fn list_users(
+        &self,
+        query_params: QueryParams,
+    ) -> Result<ListResponse, Error> {
+        let users: Vec<User> =
+            match self.store.list_users(query_params.clone()).await {
+                Ok(users) => users,
+                Err(e) => {
+                    return match e {
+                        ProviderStoreError::Scim(e) => Err(e),
 
-                    ProviderStoreError::StoreError(e) => {
-                        Err(Error::internal_error(format!("list users failed! {e}")))
-                    }
-                };
-            }
-        };
+                        ProviderStoreError::StoreError(e) => {
+                            Err(Error::internal_error(format!(
+                                "list users failed! {e}"
+                            )))
+                        }
+                    };
+                }
+            };
 
         ListResponse::from_resources(users, query_params)
     }
@@ -45,7 +51,9 @@ impl<T: ProviderStore> Provider<T> {
                     ProviderStoreError::Scim(e) => Err(e),
 
                     ProviderStoreError::StoreError(e) => {
-                        Err(Error::internal_error(format!("get user by id failed! {e}")))
+                        Err(Error::internal_error(format!(
+                            "get user by id failed! {e}"
+                        )))
                     }
                 };
             }
@@ -73,23 +81,32 @@ impl<T: ProviderStore> Provider<T> {
         unimplemented!()
     }
 
-    pub async fn delete_user(&self, _user_id: String) -> Result<SingleResourceResponse, Error> {
+    pub async fn delete_user(
+        &self,
+        _user_id: String,
+    ) -> Result<SingleResourceResponse, Error> {
         unimplemented!()
     }
 
-    pub async fn list_groups(&self, query_params: QueryParams) -> Result<ListResponse, Error> {
-        let groups: Vec<Group> = match self.store.list_groups(query_params.clone()).await {
-            Ok(groups) => groups,
-            Err(e) => {
-                return match e {
-                    ProviderStoreError::Scim(e) => Err(e),
+    pub async fn list_groups(
+        &self,
+        query_params: QueryParams,
+    ) -> Result<ListResponse, Error> {
+        let groups: Vec<Group> =
+            match self.store.list_groups(query_params.clone()).await {
+                Ok(groups) => groups,
+                Err(e) => {
+                    return match e {
+                        ProviderStoreError::Scim(e) => Err(e),
 
-                    ProviderStoreError::StoreError(e) => {
-                        Err(Error::internal_error(format!("list groups failed! {e}")))
-                    }
-                };
-            }
-        };
+                        ProviderStoreError::StoreError(e) => {
+                            Err(Error::internal_error(format!(
+                                "list groups failed! {e}"
+                            )))
+                        }
+                    };
+                }
+            };
 
         ListResponse::from_resources(groups, query_params)
     }
@@ -106,9 +123,11 @@ impl<T: ProviderStore> Provider<T> {
                 return match e {
                     ProviderStoreError::Scim(e) => Err(e),
 
-                    ProviderStoreError::StoreError(e) => Err(Error::internal_error(format!(
-                        "get group by id failed! {e}"
-                    ))),
+                    ProviderStoreError::StoreError(e) => {
+                        Err(Error::internal_error(format!(
+                            "get group by id failed! {e}"
+                        )))
+                    }
                 };
             }
         };
@@ -135,7 +154,10 @@ impl<T: ProviderStore> Provider<T> {
         unimplemented!()
     }
 
-    pub async fn delete_group(&self, _group_id: String) -> Result<SingleResourceResponse, Error> {
+    pub async fn delete_group(
+        &self,
+        _group_id: String,
+    ) -> Result<SingleResourceResponse, Error> {
         unimplemented!()
     }
 }
