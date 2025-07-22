@@ -68,26 +68,31 @@ impl<T: ProviderStore> Provider<T> {
         query_params: QueryParams,
         user_id: String,
     ) -> Result<SingleResourceResponse, Error> {
-        let user = self.store.get_user_by_id(user_id.clone()).await.map_err(
-            err_with_context(format!("get user by id {user_id} failed!")),
-        )?;
+        let stored_user =
+            self.store.get_user_by_id(user_id.clone()).await.map_err(
+                err_with_context(format!("get user by id {user_id} failed!")),
+            )?;
 
-        let Some(user) = user else {
+        let Some(stored_user) = stored_user else {
             return Err(Error::not_found(user_id));
         };
 
-        SingleResourceResponse::from_resource(user, Some(query_params))
+        let StoredParts { resource: user, meta } = stored_user.into();
+        SingleResourceResponse::from_resource(user, meta, Some(query_params))
     }
 
     pub async fn create_user(
         &self,
         request: CreateUserRequest,
     ) -> Result<SingleResourceResponse, Error> {
-        self.store
+        let stored_user = self
+            .store
             .create_user(request)
             .await
-            .map_err(err_with_context("create user failed!".to_string()))
-            .map(|user| SingleResourceResponse::from_resource(user, None))?
+            .map_err(err_with_context("create user failed!".to_string()))?;
+
+        let StoredParts { resource: user, meta } = stored_user.into();
+        SingleResourceResponse::from_resource(user, meta, None)
     }
 
     pub async fn replace_user(
@@ -127,17 +132,20 @@ impl<T: ProviderStore> Provider<T> {
         query_params: QueryParams,
         group_id: String,
     ) -> Result<SingleResourceResponse, Error> {
-        let group =
+        let stored_group =
             self.store.get_group_by_id(group_id.clone()).await.map_err(
                 err_with_context(format!("get group by id {group_id} failed!")),
             )?;
 
-        let Some(group) = group else {
+        let Some(stored_group) = stored_group else {
             return Err(Error::not_found(group_id));
         };
 
+        let StoredParts { resource: group, meta } = stored_group.into();
+
         SingleResourceResponse::from_resource::<Group>(
             group,
+            meta,
             Some(query_params),
         )
     }
@@ -146,11 +154,13 @@ impl<T: ProviderStore> Provider<T> {
         &self,
         request: CreateGroupRequest,
     ) -> Result<SingleResourceResponse, Error> {
-        self.store
-            .create_group(request)
-            .await
-            .map_err(err_with_context("create group failed!".to_string()))
-            .map(|group| SingleResourceResponse::from_resource(group, None))?
+        let stored_group =
+            self.store.create_group(request).await.map_err(
+                err_with_context("create group failed!".to_string()),
+            )?;
+
+        let StoredParts { resource: group, meta } = stored_group.into();
+        SingleResourceResponse::from_resource(group, meta, None)
     }
 
     pub async fn replace_group(

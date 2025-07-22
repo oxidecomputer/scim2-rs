@@ -5,6 +5,7 @@
 use serde::Serialize;
 
 pub trait Resource: std::fmt::Debug + Serialize {
+    fn id(&self) -> String;
     fn schema() -> String;
     fn resource_type() -> String;
 }

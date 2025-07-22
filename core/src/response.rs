@@ -25,31 +25,34 @@ pub struct ListResponse {
 }
 
 impl ListResponse {
-    pub fn from_resources<R>(
-        resources: Vec<R>,
-        _query_params: QueryParams,
+    pub fn from_resources<R, S>(
+        resources: Vec<S>,
+        query_params: QueryParams,
     ) -> Result<Self, Error>
     where
         R: Resource,
+        S: Into<StoredParts<R>>,
     {
         let schemas = vec![String::from(
             "urn:ietf:params:scim:api:messages:2.0:ListResponse",
         )];
 
-        // TODO: filter by attributes
-        // pagination should have happened before this, but fill in start_index
-        // and items_per_page below
+        // TODO pagination should have happened before this, but fill in
+        // start_index and items_per_page below based on query_params
 
         let resources = resources
             .into_iter()
-            // We have a strongly typed `Resource` but SCIM allows for IdP's to
-            // request a subset of fields via attributes so we need to allow for
-            // dynamic manipulation.
-            .map(|r| {
-                // Make any modifications to the obj here
-                let obj = serialize_resource_to_object(r)?;
-                Ok(obj)
+            .map(|s| {
+                let StoredParts { resource, meta } = s.into();
+                SingleResourceResponse::from_resource(
+                    resource,
+                    meta,
+                    Some(query_params.clone()),
+                )
             })
+            .collect::<Result<Vec<_>, Error>>()?
+            .into_iter()
+            .map(serialize_resource_to_object)
             .collect::<Result<Vec<_>, Error>>()?;
 
         Ok(ListResponse {
@@ -86,7 +89,7 @@ impl ListResponse {
     }
 }
 
-#[derive(Serialize, JsonSchema)]
+#[derive(Serialize, JsonSchema, Debug)]
 struct ResourceInner {
     #[serde(flatten)]
     resource: serde_json::Map<String, serde_json::Value>,
@@ -94,7 +97,7 @@ struct ResourceInner {
 }
 
 /// The generic response used to return a single resource
-#[derive(Serialize, JsonSchema)]
+#[derive(Serialize, JsonSchema, Debug)]
 pub struct SingleResourceResponse {
     #[serde(flatten)]
     resource: ResourceInner,
@@ -105,21 +108,35 @@ pub struct SingleResourceResponse {
 impl SingleResourceResponse {
     pub fn from_resource<R>(
         resource: R,
+        meta: StoredMeta,
         _query_params: Option<QueryParams>,
     ) -> Result<Self, Error>
     where
         R: Resource + Serialize,
     {
+        let id = resource.id();
+
         // We have a strongly typed `Resource` but SCIM allows for IdP's to
         // request a subset of fields via attributes so we need to allow for
         // dynamic manipulation.
         let obj = serialize_resource_to_object(resource)?;
+
         let resource =
             ResourceInner { resource: obj, schemas: vec![R::schema()] };
 
         Ok(SingleResourceResponse {
             resource,
-            meta: Meta { resource_type: R::resource_type() },
+            meta: Meta {
+                resource_type: R::resource_type(),
+                created: meta.created,
+                last_modified: meta.last_modified,
+                version: meta.version,
+                location: format!(
+                    "http://127.0.0.1:4567/v2/{}s/{}",
+                    R::resource_type(),
+                    id
+                ),
+            },
         })
     }
 
@@ -250,7 +267,7 @@ fn serialize_resource_to_object<R>(
     resource: R,
 ) -> Result<serde_json::Map<String, serde_json::Value>, Error>
 where
-    R: Resource,
+    R: Serialize + std::fmt::Debug,
 {
     let value = match serde_json::to_value(&resource) {
         Ok(value) => value,

@@ -27,11 +27,44 @@ pub struct Group {
 }
 
 impl Resource for Group {
+    fn id(&self) -> String {
+        self.id.clone()
+    }
+
     fn schema() -> String {
         String::from("urn:ietf:params:scim:schemas:core:2.0:Group")
     }
 
     fn resource_type() -> String {
         String::from("Group")
+    }
+}
+
+/// A StoredGroup is one that combines the fields in Group and StoredMeta.
+#[derive(Clone)]
+pub struct StoredGroup {
+    pub id: String,
+    pub display_name: String,
+    pub external_id: Option<String>,
+    pub created: DateTime<Utc>,
+    pub last_modified: DateTime<Utc>,
+    pub version: String,
+}
+
+impl From<StoredGroup> for StoredParts<Group> {
+    fn from(u: StoredGroup) -> StoredParts<Group> {
+        let group = Group {
+            id: u.id,
+            display_name: u.display_name,
+            external_id: u.external_id,
+        };
+
+        let meta = StoredMeta {
+            created: u.created,
+            last_modified: u.last_modified,
+            version: u.version,
+        };
+
+        StoredParts { resource: group, meta }
     }
 }

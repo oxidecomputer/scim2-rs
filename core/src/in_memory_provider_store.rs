@@ -9,8 +9,8 @@ use uuid::Uuid;
 
 /// A non-optimized provider store implementation for use with tests
 pub struct InMemoryProviderStore {
-    users: Mutex<Vec<User>>,
-    groups: Mutex<Vec<Group>>,
+    users: Mutex<Vec<StoredUser>>,
+    groups: Mutex<Vec<StoredGroup>>,
 }
 
 impl Default for InMemoryProviderStore {
@@ -30,7 +30,7 @@ impl ProviderStore for InMemoryProviderStore {
     async fn get_user_by_id(
         &self,
         user_id: String,
-    ) -> Result<Option<User>, ProviderStoreError> {
+    ) -> Result<Option<StoredUser>, ProviderStoreError> {
         let users = self.users.lock().unwrap();
         Ok(users.iter().find(|user| user.id == user_id).cloned())
     }
@@ -38,7 +38,7 @@ impl ProviderStore for InMemoryProviderStore {
     async fn get_user_by_username(
         &self,
         user_name: String,
-    ) -> Result<Option<User>, ProviderStoreError> {
+    ) -> Result<Option<StoredUser>, ProviderStoreError> {
         let users = self.users.lock().unwrap();
         Ok(users.iter().find(|user| user.name == user_name).cloned())
     }
@@ -46,17 +46,20 @@ impl ProviderStore for InMemoryProviderStore {
     async fn create_user(
         &self,
         user_request: CreateUserRequest,
-    ) -> Result<User, ProviderStoreError> {
+    ) -> Result<StoredUser, ProviderStoreError> {
         if self.get_user_by_username(user_request.name.clone()).await?.is_some()
         {
             return Err(Error::conflict(user_request.name).into());
         }
 
-        let new_user = User {
+        let new_user = StoredUser {
             id: Uuid::new_v4().to_string(),
             name: user_request.name,
             external_id: user_request.external_id,
             active: user_request.active.unwrap_or(true),
+            created: Utc::now(),
+            last_modified: Utc::now(),
+            version: String::from("W/unimplemented"),
         };
 
         let mut users = self.users.lock().unwrap();
@@ -68,7 +71,7 @@ impl ProviderStore for InMemoryProviderStore {
     async fn list_users(
         &self,
         _query_params: QueryParams,
-    ) -> Result<Vec<User>, ProviderStoreError> {
+    ) -> Result<Vec<StoredUser>, ProviderStoreError> {
         let users = self.users.lock().unwrap();
         Ok(users.clone())
     }
@@ -85,7 +88,7 @@ impl ProviderStore for InMemoryProviderStore {
     async fn get_group_by_id(
         &self,
         group_id: String,
-    ) -> Result<Option<Group>, ProviderStoreError> {
+    ) -> Result<Option<StoredGroup>, ProviderStoreError> {
         let groups = self.groups.lock().unwrap();
         Ok(groups.iter().find(|group| group.id == group_id).cloned())
     }
@@ -93,7 +96,7 @@ impl ProviderStore for InMemoryProviderStore {
     async fn get_group_by_displayname(
         &self,
         display_name: String,
-    ) -> Result<Option<Group>, ProviderStoreError> {
+    ) -> Result<Option<StoredGroup>, ProviderStoreError> {
         let groups = self.groups.lock().unwrap();
         Ok(groups
             .iter()
@@ -104,7 +107,7 @@ impl ProviderStore for InMemoryProviderStore {
     async fn create_group(
         &self,
         group_request: CreateGroupRequest,
-    ) -> Result<Group, ProviderStoreError> {
+    ) -> Result<StoredGroup, ProviderStoreError> {
         if self
             .get_group_by_displayname(group_request.display_name.clone())
             .await?
@@ -113,10 +116,13 @@ impl ProviderStore for InMemoryProviderStore {
             return Err(Error::conflict(group_request.display_name).into());
         }
 
-        let new_group = Group {
+        let new_group = StoredGroup {
             id: Uuid::new_v4().to_string(),
             display_name: group_request.display_name,
             external_id: group_request.external_id,
+            created: Utc::now(),
+            last_modified: Utc::now(),
+            version: String::from("W/unimplemented"),
         };
 
         let mut groups = self.groups.lock().unwrap();
@@ -128,7 +134,7 @@ impl ProviderStore for InMemoryProviderStore {
     async fn list_groups(
         &self,
         _query_params: QueryParams,
-    ) -> Result<Vec<Group>, ProviderStoreError> {
+    ) -> Result<Vec<StoredGroup>, ProviderStoreError> {
         let groups = self.groups.lock().unwrap();
         Ok(groups.clone())
     }

@@ -33,11 +33,46 @@ pub struct User {
 }
 
 impl Resource for User {
+    fn id(&self) -> String {
+        self.id.clone()
+    }
+
     fn schema() -> String {
         String::from("urn:ietf:params:scim:schemas:core:2.0:User")
     }
 
     fn resource_type() -> String {
         String::from("User")
+    }
+}
+
+/// A StoredUser is one that combines the fields in User and StoredMeta.
+#[derive(Clone)]
+pub struct StoredUser {
+    pub id: String,
+    pub name: String,
+    pub active: bool,
+    pub external_id: Option<String>,
+    pub created: DateTime<Utc>,
+    pub last_modified: DateTime<Utc>,
+    pub version: String,
+}
+
+impl From<StoredUser> for StoredParts<User> {
+    fn from(u: StoredUser) -> StoredParts<User> {
+        let user = User {
+            id: u.id,
+            name: u.name,
+            active: u.active,
+            external_id: u.external_id,
+        };
+
+        let meta = StoredMeta {
+            created: u.created,
+            last_modified: u.last_modified,
+            version: u.version,
+        };
+
+        StoredParts { resource: user, meta }
     }
 }
