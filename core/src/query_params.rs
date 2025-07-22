@@ -4,10 +4,9 @@
 
 use super::*;
 
-#[derive(Deserialize, JsonSchema, Clone)]
+#[derive(Deserialize, JsonSchema, Clone, Debug)]
 pub struct QueryParams {
-    // TODO: attributes
-
+    pub attributes: Option<String>,
     // TODO: pagination: start_index and count
 
     // TODO: filter

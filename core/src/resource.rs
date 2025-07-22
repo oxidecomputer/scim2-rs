@@ -4,8 +4,25 @@
 
 use serde::Serialize;
 
+#[derive(Debug, Copy, Clone, PartialEq, strum_macros::Display)]
+pub enum ResourceType {
+    User,
+    Group,
+}
+
+impl ResourceType {
+    pub fn urn(&self) -> &str {
+        match self {
+            ResourceType::User => "urn:ietf:params:scim:schemas:core:2.0:User",
+            ResourceType::Group => {
+                "urn:ietf:params:scim:schemas:core:2.0:Group"
+            }
+        }
+    }
+}
+
 pub trait Resource: std::fmt::Debug + Serialize {
     fn id(&self) -> String;
     fn schema() -> String;
-    fn resource_type() -> String;
+    fn resource_type() -> ResourceType;
 }

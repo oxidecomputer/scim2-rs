@@ -38,11 +38,11 @@ impl Resource for User {
     }
 
     fn schema() -> String {
-        String::from("urn:ietf:params:scim:schemas:core:2.0:User")
+        ResourceType::User.urn().to_string()
     }
 
-    fn resource_type() -> String {
-        String::from("User")
+    fn resource_type() -> ResourceType {
+        ResourceType::User
     }
 }
 
@@ -75,4 +75,19 @@ impl From<StoredUser> for StoredParts<User> {
 
         StoredParts { resource: user, meta }
     }
+}
+
+#[derive(Debug, strum_macros::Display, strum_macros::EnumString, PartialEq)]
+#[strum(ascii_case_insensitive)]
+pub enum UserAttr {
+    #[strum(to_string = "id")]
+    Id,
+    #[strum(to_string = "userName")]
+    Name,
+    #[strum(to_string = "active")]
+    Active,
+    #[strum(to_string = "externalId")]
+    ExternalId,
+    Schemas,
+    Meta,
 }

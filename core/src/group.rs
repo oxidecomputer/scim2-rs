@@ -32,11 +32,11 @@ impl Resource for Group {
     }
 
     fn schema() -> String {
-        String::from("urn:ietf:params:scim:schemas:core:2.0:Group")
+        ResourceType::Group.urn().to_string()
     }
 
-    fn resource_type() -> String {
-        String::from("Group")
+    fn resource_type() -> ResourceType {
+        ResourceType::Group
     }
 }
 
@@ -67,4 +67,18 @@ impl From<StoredGroup> for StoredParts<Group> {
 
         StoredParts { resource: group, meta }
     }
+}
+
+#[derive(Debug, strum_macros::Display, strum_macros::EnumString, PartialEq)]
+#[strum(ascii_case_insensitive)]
+pub enum GroupAttr {
+    // XXX ugh this is always required....
+    #[strum(to_string = "id")]
+    Id,
+    #[strum(to_string = "displayName")]
+    DisplayName,
+    #[strum(to_string = "externalId")]
+    ExternalId,
+    Schemas,
+    Meta,
 }

@@ -2,6 +2,8 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 
+use std::str::FromStr;
+
 use super::*;
 
 /// The generic response used to return a list of resources
@@ -47,7 +49,7 @@ impl ListResponse {
                 SingleResourceResponse::from_resource(
                     resource,
                     meta,
-                    Some(query_params.clone()),
+                    Some(dbg!(&query_params).clone()),
                 )
             })
             .collect::<Result<Vec<_>, Error>>()?
@@ -109,7 +111,7 @@ impl SingleResourceResponse {
     pub fn from_resource<R>(
         resource: R,
         meta: StoredMeta,
-        _query_params: Option<QueryParams>,
+        query_params: Option<QueryParams>,
     ) -> Result<Self, Error>
     where
         R: Resource + Serialize,
@@ -119,15 +121,39 @@ impl SingleResourceResponse {
         // We have a strongly typed `Resource` but SCIM allows for IdP's to
         // request a subset of fields via attributes so we need to allow for
         // dynamic manipulation.
-        let obj = serialize_resource_to_object(resource)?;
+        let mut obj = serialize_resource_to_object(resource)?;
+        let (_meta_attrs, user_group_attrs): (Vec<_>, Vec<_>) = query_params
+            .map(|qp| {
+                parse_scim_query_attributes(
+                    &qp.attributes.unwrap_or_default(),
+                    R::resource_type(),
+                )
+            })
+            .unwrap_or_default()
+            .into_iter()
+            .partition(|attr| matches!(attr, ScimAttribute::Meta(_)));
 
+        // XXX This is a bit of a mess...
+        // - certain fields like "id" in a `User` is always required
+        // - the schemas field is not tracked anywhere
+        // - the meta field is still strucutred rather than being a `Map` we can
+        //   mutate
+        if !user_group_attrs.is_empty() {
+            obj = user_group_attrs
+                .into_iter()
+                .filter_map(|attr| {
+                    obj.get_key_value(&attr.resource_key())
+                        .map(|(k, v)| (k.clone(), v.clone()))
+                })
+                .collect()
+        }
         let resource =
             ResourceInner { resource: obj, schemas: vec![R::schema()] };
 
         Ok(SingleResourceResponse {
             resource,
             meta: Meta {
-                resource_type: R::resource_type(),
+                resource_type: R::resource_type().to_string(),
                 created: meta.created,
                 last_modified: meta.last_modified,
                 version: meta.version,
@@ -316,5 +342,188 @@ where
         _ => Err(Error::internal_error(format!(
             "resource {resource:?} is not a JSON object"
         ))),
+    }
+}
+
+fn parse_scim_query_attributes(
+    query_param: &str,
+    resource_type: ResourceType,
+) -> Vec<ScimAttribute> {
+    query_param
+        .split(',')
+        .flat_map(|qp| ScimAttribute::parse(resource_type, qp))
+        .collect()
+}
+
+#[derive(Debug, PartialEq)]
+enum ScimAttribute {
+    User(UserAttr),
+    Group(GroupAttr),
+    Meta(MetaAttr),
+}
+
+impl ScimAttribute {
+    /// Parse an attribute based on RFC 7644 Section 3.10
+    fn parse(resource_type: ResourceType, raw: &str) -> Option<Self> {
+        // All facets (URN, attribute, and sub-attribute name) of the fully
+        // encoded attribute name are case insensitive.
+        let urn = resource_type.urn().to_lowercase();
+        let raw = raw.trim().to_lowercase();
+
+        //{urn}:{Attribute name}.{Sub-Attribute name}.
+        // For example, the fully qualified path for a User's givenName is
+        // "urn:ietf:params:scim:schemas:core:2.0:User:name.givenName"
+        let mut parts = raw.rsplitn(2, ':');
+        let obj_path = parts.next()?;
+
+        // Clients MAY omit core schema attribute URN prefixes but SHOULD fully
+        // qualify extended attributes with the associated schema extension URN
+        // to avoid naming conflicts.
+        if let Some(schema) = parts.next() {
+            if schema != urn {
+                return None;
+            }
+        }
+
+        // TODO: We should probably log this unexpected case once we have a
+        // logger to pass around.
+        if parts.next().is_some() {
+            return None;
+        }
+
+        // Figure out if we have an attribute name and a sub-attribute name
+        let mut attr_parts = obj_path.splitn(2, '.');
+        let attr = attr_parts.next()?;
+
+        let attribute = match resource_type {
+            ResourceType::User => {
+                match UserAttr::from_str(attr).ok()? {
+                    // This is the only sub-attribute we support
+                    UserAttr::Meta => {
+                        match attr_parts.next() {
+                            // We want some portion of the meta object
+                            Some(sub_attr) => {
+                                Self::Meta(MetaAttr::from_str(sub_attr).ok()?)
+                            }
+                            // We want the full meta object
+                            None => Self::User(UserAttr::Meta),
+                        }
+                    }
+                    attribute => Self::User(attribute),
+                }
+            }
+            ResourceType::Group => {
+                match GroupAttr::from_str(attr).ok()? {
+                    // This is the only sub-attribute we support
+                    GroupAttr::Meta => {
+                        match attr_parts.next() {
+                            // We want some portion of the meta object
+                            Some(sub_attr) => {
+                                Self::Meta(MetaAttr::from_str(sub_attr).ok()?)
+                            }
+                            // We want the full meta object
+                            None => Self::Group(GroupAttr::Meta),
+                        }
+                    }
+                    attribute => Self::Group(attribute),
+                }
+            }
+        };
+
+        Some(attribute)
+    }
+
+    fn resource_key(&self) -> String {
+        match self {
+            ScimAttribute::User(user_attr) => user_attr.to_string(),
+            ScimAttribute::Group(group_attr) => group_attr.to_string(),
+            ScimAttribute::Meta(meta_attr) => meta_attr.to_string(),
+        }
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use crate::{GroupAttr, UserAttr, response::ScimAttribute};
+
+    #[test]
+    fn test_user_attribute_parsing() {
+        // User field
+        assert_eq!(
+            ScimAttribute::parse(crate::ResourceType::User, "userName"),
+            Some(ScimAttribute::User(UserAttr::Name))
+        );
+
+        // User field with urn prefix
+        assert_eq!(
+            ScimAttribute::parse(
+                crate::ResourceType::User,
+                "urn:ietf:params:scim:schemas:core:2.0:User:username"
+            ),
+            Some(ScimAttribute::User(UserAttr::Name))
+        );
+
+        // User field with wrong urn prefix
+        assert_eq!(
+            ScimAttribute::parse(
+                crate::ResourceType::User,
+                "urn:ietf:params:scim:schemas:core:2.0:Group:name"
+            ),
+            None
+        );
+
+        // User full meta attr requested
+        assert_eq!(
+            ScimAttribute::parse(crate::ResourceType::User, "meta"),
+            Some(ScimAttribute::User(UserAttr::Meta))
+        );
+
+        // User sub-meta attr requested
+        assert_eq!(
+            ScimAttribute::parse(crate::ResourceType::User, "meta.location"),
+            Some(ScimAttribute::Meta(crate::MetaAttr::Location))
+        );
+    }
+
+    #[test]
+    fn test_group_attribute_parsing() {
+        // Group field -- all lowercase
+        assert_eq!(
+            ScimAttribute::parse(crate::ResourceType::Group, "displayname"),
+            Some(ScimAttribute::Group(GroupAttr::DisplayName))
+        );
+
+        // Group field with urn prefix
+        assert_eq!(
+            ScimAttribute::parse(
+                crate::ResourceType::Group,
+                "urn:ietf:params:scim:schemas:core:2.0:Group:displayName"
+            ),
+            Some(ScimAttribute::Group(GroupAttr::DisplayName))
+        );
+
+        // Group field with wrong urn prefix
+        assert_eq!(
+            ScimAttribute::parse(
+                crate::ResourceType::Group,
+                "urn:ietf:params:scim:schemas:core:2.0:User:displayName"
+            ),
+            None
+        );
+
+        // Group full meta attr requested
+        assert_eq!(
+            ScimAttribute::parse(crate::ResourceType::Group, "meta"),
+            Some(ScimAttribute::Group(GroupAttr::Meta))
+        );
+
+        // Group sub-meta attr requested
+        assert_eq!(
+            ScimAttribute::parse(
+                crate::ResourceType::Group,
+                "meta.lastmodified"
+            ),
+            Some(ScimAttribute::Meta(crate::MetaAttr::LastModified))
+        );
     }
 }
