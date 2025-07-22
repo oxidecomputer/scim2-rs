@@ -6,7 +6,7 @@ use super::*;
 
 struct MappedError {
     inner: ProviderStoreError,
-    context: &'static str,
+    context: String,
 }
 
 impl From<MappedError> for Error {
@@ -22,13 +22,13 @@ impl From<MappedError> for Error {
 }
 
 impl ProviderStoreError {
-    fn with_context(self, context: &'static str) -> MappedError {
+    fn with_context(self, context: String) -> MappedError {
         match self {
             inner @ ProviderStoreError::StoreError(_) => {
                 MappedError { inner, context }
             }
             inner @ ProviderStoreError::Scim(_) => {
-                MappedError { inner, context: "" }
+                MappedError { inner, context: String::new() }
             }
         }
     }
@@ -36,7 +36,7 @@ impl ProviderStoreError {
 
 /// Create a `MappedError` with the provided context
 fn err_with_context(
-    context: &'static str,
+    context: String,
 ) -> impl FnOnce(ProviderStoreError) -> MappedError {
     move |e| e.with_context(context)
 }
@@ -59,7 +59,7 @@ impl<T: ProviderStore> Provider<T> {
         self.store
             .list_users(query_params.clone())
             .await
-            .map_err(err_with_context("list users failed!"))
+            .map_err(err_with_context("list users failed!".to_string()))
             .map(|users| ListResponse::from_resources(users, query_params))?
     }
 
@@ -68,11 +68,9 @@ impl<T: ProviderStore> Provider<T> {
         query_params: QueryParams,
         user_id: String,
     ) -> Result<SingleResourceResponse<User>, Error> {
-        let user = self
-            .store
-            .get_user_by_id(user_id.clone())
-            .await
-            .map_err(err_with_context("get user by id failed!"))?;
+        let user = self.store.get_user_by_id(user_id.clone()).await.map_err(
+            err_with_context(format!("get user by id {user_id} failed!")),
+        )?;
 
         let Some(user) = user else {
             return Err(Error::not_found(user_id));
@@ -88,7 +86,7 @@ impl<T: ProviderStore> Provider<T> {
         self.store
             .create_user(request)
             .await
-            .map_err(err_with_context("create user failed!"))
+            .map_err(err_with_context("create user failed!".to_string()))
             .map(|user| {
                 SingleResourceResponse::from_resource::<User>(user, None)
             })?
@@ -109,7 +107,9 @@ impl<T: ProviderStore> Provider<T> {
         self.store
             .delete_user_by_id(user_id.clone())
             .await
-            .map_err(err_with_context("delete user by id failed!"))
+            .map_err(err_with_context(format!(
+                "delete user by id {user_id} failed!"
+            )))
             .map(|_| deleted_http_response())?
     }
 
@@ -120,7 +120,7 @@ impl<T: ProviderStore> Provider<T> {
         self.store
             .list_groups(query_params.clone())
             .await
-            .map_err(err_with_context("list groups failed!"))
+            .map_err(err_with_context("list groups failed!".to_string()))
             .map(|groups| ListResponse::from_resources(groups, query_params))?
     }
 
@@ -129,11 +129,10 @@ impl<T: ProviderStore> Provider<T> {
         query_params: QueryParams,
         group_id: String,
     ) -> Result<SingleResourceResponse<Group>, Error> {
-        let group = self
-            .store
-            .get_group_by_id(group_id.clone())
-            .await
-            .map_err(err_with_context("get group by id failed!"))?;
+        let group =
+            self.store.get_group_by_id(group_id.clone()).await.map_err(
+                err_with_context(format!("get group by id {group_id} failed!")),
+            )?;
 
         let Some(group) = group else {
             return Err(Error::not_found(group_id));
@@ -152,7 +151,7 @@ impl<T: ProviderStore> Provider<T> {
         self.store
             .create_group(request)
             .await
-            .map_err(err_with_context("create group failed!"))
+            .map_err(err_with_context("create group failed!".to_string()))
             .map(|group| {
                 SingleResourceResponse::from_resource::<Group>(group, None)
             })?
@@ -173,7 +172,9 @@ impl<T: ProviderStore> Provider<T> {
         self.store
             .delete_group_by_id(group_id.clone())
             .await
-            .map_err(err_with_context("delete group by id failed!"))
+            .map_err(err_with_context(format!(
+                "delete group by id {group_id} failed!"
+            )))
             .map(|_| deleted_http_response())?
     }
 }
