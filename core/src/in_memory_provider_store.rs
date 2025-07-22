@@ -108,14 +108,6 @@ impl ProviderStore for InMemoryProviderStore {
         &self,
         group_request: CreateGroupRequest,
     ) -> Result<StoredGroup, ProviderStoreError> {
-        if self
-            .get_group_by_displayname(group_request.display_name.clone())
-            .await?
-            .is_some()
-        {
-            return Err(Error::conflict(group_request.display_name).into());
-        }
-
         let new_group = StoredGroup {
             id: Uuid::new_v4().to_string(),
             display_name: group_request.display_name,

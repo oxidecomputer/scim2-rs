@@ -107,6 +107,15 @@ impl<T: ProviderStore> Provider<T> {
         &self,
         user_id: String,
     ) -> Result<Response<Body>, Error> {
+        let stored_user =
+            self.store.get_user_by_id(user_id.clone()).await.map_err(
+                err_with_context(format!("get user by id {user_id} failed!")),
+            )?;
+
+        let Some(_stored_user) = stored_user else {
+            return Err(Error::not_found(user_id));
+        };
+
         self.store
             .delete_user_by_id(user_id.clone())
             .await
@@ -175,6 +184,15 @@ impl<T: ProviderStore> Provider<T> {
         &self,
         group_id: String,
     ) -> Result<Response<Body>, Error> {
+        let stored_group =
+            self.store.get_group_by_id(group_id.clone()).await.map_err(
+                err_with_context(format!("get group by id {group_id} failed!")),
+            )?;
+
+        let Some(_stored_group) = stored_group else {
+            return Err(Error::not_found(group_id));
+        };
+
         self.store
             .delete_group_by_id(group_id.clone())
             .await

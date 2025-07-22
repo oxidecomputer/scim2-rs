@@ -5,7 +5,7 @@
 use super::*;
 
 /// The generic response used to return a list of resources
-#[derive(Serialize, JsonSchema)]
+#[derive(Deserialize, Serialize, JsonSchema)]
 pub struct ListResponse {
     pub schemas: Vec<String>,
 
@@ -89,20 +89,21 @@ impl ListResponse {
     }
 }
 
-#[derive(Serialize, JsonSchema, Debug)]
-struct ResourceInner {
+#[derive(Deserialize, Serialize, JsonSchema, Debug)]
+pub struct ResourceInner {
     #[serde(flatten)]
-    resource: serde_json::Map<String, serde_json::Value>,
-    schemas: Vec<String>,
+    pub resource: serde_json::Map<String, serde_json::Value>,
+
+    pub schemas: Vec<String>,
 }
 
 /// The generic response used to return a single resource
-#[derive(Serialize, JsonSchema, Debug)]
+#[derive(Deserialize, Serialize, JsonSchema, Debug)]
 pub struct SingleResourceResponse {
     #[serde(flatten)]
-    resource: ResourceInner,
+    pub resource: ResourceInner,
 
-    meta: Meta,
+    pub meta: Meta,
 }
 
 impl SingleResourceResponse {
@@ -170,7 +171,7 @@ impl SingleResourceResponse {
 
 /// The SCIM error types specified in RFC 7644, section 3.12
 // RFC 7644, section 3.12:  HTTP Status and Error Response Handling
-#[derive(Serialize, JsonSchema, Debug)]
+#[derive(Deserialize, Serialize, JsonSchema, Debug, PartialEq)]
 pub enum ErrorType {
     #[serde(rename = "invalidFilter")]
     InvalidFilter,
@@ -180,17 +181,17 @@ pub enum ErrorType {
 }
 
 /// The SCIM error format is specified in RFC 7644, section 3.12
-#[derive(Serialize, JsonSchema, Debug)]
+#[derive(Deserialize, Serialize, JsonSchema, Debug)]
 pub struct Error {
-    schemas: Vec<String>,
+    pub schemas: Vec<String>,
 
-    status: String,
+    pub status: String,
 
     #[serde(skip_serializing_if = "Option::is_none")]
     #[serde(rename = "scimType")]
-    error_type: Option<ErrorType>,
+    pub error_type: Option<ErrorType>,
 
-    detail: String,
+    pub detail: String,
 }
 
 impl Error {

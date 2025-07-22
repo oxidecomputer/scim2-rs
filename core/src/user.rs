@@ -16,7 +16,7 @@ pub struct CreateUserRequest {
     pub external_id: Option<String>,
 }
 
-#[derive(Serialize, Deserialize, JsonSchema, Clone, Debug)]
+#[derive(Serialize, Deserialize, JsonSchema, Clone, Debug, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct User {
     pub id: String,
@@ -24,7 +24,7 @@ pub struct User {
     #[serde(rename = "userName")]
     pub name: String,
 
-    pub active: bool,
+    pub active: Option<bool>,
 
     /// An identifier for the resource as defined by the provisioning client
     // This is an OPTIONAL attribute, so skip serializing it if it's null.
@@ -63,7 +63,7 @@ impl From<StoredUser> for StoredParts<User> {
         let user = User {
             id: u.id,
             name: u.name,
-            active: u.active,
+            active: Some(u.active),
             external_id: u.external_id,
         };
 
