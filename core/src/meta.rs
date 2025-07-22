@@ -4,13 +4,25 @@
 
 use super::*;
 
-#[derive(Serialize, JsonSchema, Clone)]
+#[derive(Serialize, JsonSchema, Clone, Debug)]
 #[serde(rename_all = "camelCase")]
 pub struct Meta {
     pub resource_type: String,
-    // TODO:
-    // - created
-    // - lastModified
-    // - location (optional)
-    // - version (optional)
+
+    pub created: DateTime<Utc>,
+
+    pub last_modified: DateTime<Utc>,
+
+    pub version: String,
+
+    pub location: String,
+}
+
+#[derive(Clone)]
+pub struct StoredMeta {
+    pub created: DateTime<Utc>,
+
+    pub last_modified: DateTime<Utc>,
+
+    pub version: String,
 }

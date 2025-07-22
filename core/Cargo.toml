@@ -12,3 +12,4 @@ anyhow.workspace = true
 dropshot.workspace = true
 http.workspace = true
 uuid.workspace = true
+chrono.workspace = true
