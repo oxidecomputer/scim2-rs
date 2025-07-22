@@ -4,6 +4,43 @@
 
 use super::*;
 
+struct MappedError {
+    inner: ProviderStoreError,
+    context: &'static str,
+}
+
+impl From<MappedError> for Error {
+    fn from(value: MappedError) -> Self {
+        match value.inner {
+            ProviderStoreError::StoreError(error) => {
+                // XXX we want to use err_chain here probably...
+                Error::internal_error(format!("{} {error}", value.context))
+            }
+            ProviderStoreError::Scim(error) => error,
+        }
+    }
+}
+
+impl ProviderStoreError {
+    fn with_context(self, context: &'static str) -> MappedError {
+        match self {
+            inner @ ProviderStoreError::StoreError(_) => {
+                MappedError { inner, context }
+            }
+            inner @ ProviderStoreError::Scim(_) => {
+                MappedError { inner, context: "" }
+            }
+        }
+    }
+}
+
+/// Create a `MappedError` with the provided context
+fn err_with_context(
+    context: &'static str,
+) -> impl FnOnce(ProviderStoreError) -> MappedError {
+    move |e| e.with_context(context)
+}
+
 /// Provider implements SCIM CRUD over some provider store, transforming the
 /// Rust types returned by that store into the generic SCIM response types.
 pub struct Provider<T: ProviderStore> {
@@ -19,23 +56,11 @@ impl<T: ProviderStore> Provider<T> {
         &self,
         query_params: QueryParams,
     ) -> Result<ListResponse<User>, Error> {
-        let users: Vec<User> =
-            match self.store.list_users(query_params.clone()).await {
-                Ok(users) => users,
-                Err(e) => {
-                    return match e {
-                        ProviderStoreError::Scim(e) => Err(e),
-
-                        ProviderStoreError::StoreError(e) => {
-                            Err(Error::internal_error(format!(
-                                "list users failed! {e}"
-                            )))
-                        }
-                    };
-                }
-            };
-
-        ListResponse::from_resources(users, query_params)
+        self.store
+            .list_users(query_params.clone())
+            .await
+            .map_err(err_with_context("list users failed!"))
+            .map(|users| ListResponse::from_resources(users, query_params))?
     }
 
     pub async fn get_user_by_id(
@@ -43,21 +68,11 @@ impl<T: ProviderStore> Provider<T> {
         query_params: QueryParams,
         user_id: String,
     ) -> Result<SingleResourceResponse<User>, Error> {
-        let user = match self.store.get_user_by_id(user_id.clone()).await {
-            Ok(user) => user,
-
-            Err(e) => {
-                return match e {
-                    ProviderStoreError::Scim(e) => Err(e),
-
-                    ProviderStoreError::StoreError(e) => {
-                        Err(Error::internal_error(format!(
-                            "get user by id failed! {e}"
-                        )))
-                    }
-                };
-            }
-        };
+        let user = self
+            .store
+            .get_user_by_id(user_id.clone())
+            .await
+            .map_err(err_with_context("get user by id failed!"))?;
 
         let Some(user) = user else {
             return Err(Error::not_found(user_id));
@@ -70,18 +85,13 @@ impl<T: ProviderStore> Provider<T> {
         &self,
         request: CreateUserRequest,
     ) -> Result<SingleResourceResponse<User>, Error> {
-        match self.store.create_user(request).await {
-            Ok(user) => {
+        self.store
+            .create_user(request)
+            .await
+            .map_err(err_with_context("create user failed!"))
+            .map(|user| {
                 SingleResourceResponse::from_resource::<User>(user, None)
-            }
-
-            Err(e) => match e {
-                ProviderStoreError::Scim(e) => Err(e),
-                ProviderStoreError::StoreError(e) => Err(
-                    Error::internal_error(format!("create user failed! {e}")),
-                ),
-            },
-        }
+            })?
     }
 
     pub async fn replace_user(
@@ -96,42 +106,22 @@ impl<T: ProviderStore> Provider<T> {
         &self,
         user_id: String,
     ) -> Result<Response<Body>, Error> {
-        match self.store.delete_user_by_id(user_id.clone()).await {
-            Ok(_) => deleted_http_response(),
-
-            Err(e) => match e {
-                ProviderStoreError::Scim(e) => Err(e),
-
-                ProviderStoreError::StoreError(e) => {
-                    Err(Error::internal_error(format!(
-                        "delete user by id failed! {e}"
-                    )))
-                }
-            },
-        }
+        self.store
+            .delete_user_by_id(user_id.clone())
+            .await
+            .map_err(err_with_context("delete user by id failed!"))
+            .map(|_| deleted_http_response())?
     }
 
     pub async fn list_groups(
         &self,
         query_params: QueryParams,
     ) -> Result<ListResponse<Group>, Error> {
-        let groups: Vec<Group> =
-            match self.store.list_groups(query_params.clone()).await {
-                Ok(groups) => groups,
-                Err(e) => {
-                    return match e {
-                        ProviderStoreError::Scim(e) => Err(e),
-
-                        ProviderStoreError::StoreError(e) => {
-                            Err(Error::internal_error(format!(
-                                "list groups failed! {e}"
-                            )))
-                        }
-                    };
-                }
-            };
-
-        ListResponse::from_resources(groups, query_params)
+        self.store
+            .list_groups(query_params.clone())
+            .await
+            .map_err(err_with_context("list groups failed!"))
+            .map(|groups| ListResponse::from_resources(groups, query_params))?
     }
 
     pub async fn get_group_by_id(
@@ -139,21 +129,11 @@ impl<T: ProviderStore> Provider<T> {
         query_params: QueryParams,
         group_id: String,
     ) -> Result<SingleResourceResponse<Group>, Error> {
-        let group = match self.store.get_group_by_id(group_id.clone()).await {
-            Ok(group) => group,
-
-            Err(e) => {
-                return match e {
-                    ProviderStoreError::Scim(e) => Err(e),
-
-                    ProviderStoreError::StoreError(e) => {
-                        Err(Error::internal_error(format!(
-                            "get group by id failed! {e}"
-                        )))
-                    }
-                };
-            }
-        };
+        let group = self
+            .store
+            .get_group_by_id(group_id.clone())
+            .await
+            .map_err(err_with_context("get group by id failed!"))?;
 
         let Some(group) = group else {
             return Err(Error::not_found(group_id));
@@ -169,18 +149,13 @@ impl<T: ProviderStore> Provider<T> {
         &self,
         request: CreateGroupRequest,
     ) -> Result<SingleResourceResponse<Group>, Error> {
-        match self.store.create_group(request).await {
-            Ok(group) => {
+        self.store
+            .create_group(request)
+            .await
+            .map_err(err_with_context("create group failed!"))
+            .map(|group| {
                 SingleResourceResponse::from_resource::<Group>(group, None)
-            }
-
-            Err(e) => match e {
-                ProviderStoreError::Scim(e) => Err(e),
-                ProviderStoreError::StoreError(e) => Err(
-                    Error::internal_error(format!("create group failed! {e}")),
-                ),
-            },
-        }
+            })?
     }
 
     pub async fn replace_group(
@@ -195,18 +170,10 @@ impl<T: ProviderStore> Provider<T> {
         &self,
         group_id: String,
     ) -> Result<Response<Body>, Error> {
-        match self.store.delete_group_by_id(group_id.clone()).await {
-            Ok(_) => deleted_http_response(),
-
-            Err(e) => match e {
-                ProviderStoreError::Scim(e) => Err(e),
-
-                ProviderStoreError::StoreError(e) => {
-                    Err(Error::internal_error(format!(
-                        "delete group by id failed! {e}"
-                    )))
-                }
-            },
-        }
+        self.store
+            .delete_group_by_id(group_id.clone())
+            .await
+            .map_err(err_with_context("delete group by id failed!"))
+            .map(|_| deleted_http_response())?
     }
 }
