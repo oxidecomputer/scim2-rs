@@ -4,7 +4,7 @@
 
 use serde::Serialize;
 
-pub trait Resource: Serialize {
+pub trait Resource: std::fmt::Debug + Serialize {
     fn schema() -> String;
     fn resource_type() -> String;
 }

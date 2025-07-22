@@ -16,7 +16,7 @@ pub struct CreateUserRequest {
     pub external_id: Option<String>,
 }
 
-#[derive(Serialize, Deserialize, JsonSchema, Clone)]
+#[derive(Serialize, Deserialize, JsonSchema, Clone, Debug)]
 #[serde(rename_all = "camelCase")]
 pub struct User {
     pub id: String,
