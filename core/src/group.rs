@@ -51,8 +51,8 @@ pub struct StoredGroup {
     pub version: String,
 }
 
-impl From<StoredGroup> for (Group, StoredMeta) {
-    fn from(u: StoredGroup) -> (Group, StoredMeta) {
+impl From<StoredGroup> for StoredParts<Group> {
+    fn from(u: StoredGroup) -> StoredParts<Group> {
         let group = Group {
             id: u.id,
             display_name: u.display_name,
@@ -65,6 +65,6 @@ impl From<StoredGroup> for (Group, StoredMeta) {
             version: u.version,
         };
 
-        (group, meta)
+        StoredParts { resource: group, meta }
     }
 }

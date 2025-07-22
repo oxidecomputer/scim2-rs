@@ -58,8 +58,8 @@ pub struct StoredUser {
     pub version: String,
 }
 
-impl From<StoredUser> for (User, StoredMeta) {
-    fn from(u: StoredUser) -> (User, StoredMeta) {
+impl From<StoredUser> for StoredParts<User> {
+    fn from(u: StoredUser) -> StoredParts<User> {
         let user = User {
             id: u.id,
             name: u.name,
@@ -73,6 +73,6 @@ impl From<StoredUser> for (User, StoredMeta) {
             version: u.version,
         };
 
-        (user, meta)
+        StoredParts { resource: user, meta }
     }
 }

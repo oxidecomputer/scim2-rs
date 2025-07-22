@@ -77,7 +77,7 @@ impl<T: ProviderStore> Provider<T> {
             return Err(Error::not_found(user_id));
         };
 
-        let (user, meta) = stored_user.into();
+        let StoredParts { resource: user, meta } = stored_user.into();
         SingleResourceResponse::from_resource(user, meta, Some(query_params))
     }
 
@@ -91,7 +91,7 @@ impl<T: ProviderStore> Provider<T> {
             .await
             .map_err(err_with_context("create user failed!".to_string()))?;
 
-        let (user, meta) = stored_user.into();
+        let StoredParts { resource: user, meta } = stored_user.into();
         SingleResourceResponse::from_resource(user, meta, None)
     }
 
@@ -141,7 +141,7 @@ impl<T: ProviderStore> Provider<T> {
             return Err(Error::not_found(group_id));
         };
 
-        let (group, meta) = stored_group.into();
+        let StoredParts { resource: group, meta } = stored_group.into();
 
         SingleResourceResponse::from_resource::<Group>(
             group,
@@ -159,7 +159,7 @@ impl<T: ProviderStore> Provider<T> {
                 err_with_context("create group failed!".to_string()),
             )?;
 
-        let (group, meta) = stored_group.into();
+        let StoredParts { resource: group, meta } = stored_group.into();
         SingleResourceResponse::from_resource(group, meta, None)
     }
 

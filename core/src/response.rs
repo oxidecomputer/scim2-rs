@@ -31,7 +31,7 @@ impl ListResponse {
     ) -> Result<Self, Error>
     where
         R: Resource,
-        S: Into<(R, StoredMeta)>,
+        S: Into<StoredParts<R>>,
     {
         let schemas = vec![String::from(
             "urn:ietf:params:scim:api:messages:2.0:ListResponse",
@@ -43,12 +43,10 @@ impl ListResponse {
         let resources = resources
             .into_iter()
             .map(|s| {
-                let r: R;
-                let m: StoredMeta;
-                (r, m) = s.into();
+                let StoredParts { resource, meta } = s.into();
                 SingleResourceResponse::from_resource(
-                    r,
-                    m,
+                    resource,
+                    meta,
                     Some(query_params.clone()),
                 )
             })

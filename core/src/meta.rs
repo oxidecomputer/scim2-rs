@@ -26,3 +26,9 @@ pub struct StoredMeta {
 
     pub version: String,
 }
+
+#[derive(Clone)]
+pub struct StoredParts<R> {
+    pub resource: R,
+    pub meta: StoredMeta,
+}
