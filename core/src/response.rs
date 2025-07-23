@@ -184,7 +184,7 @@ pub enum ErrorType {
 pub struct Error {
     schemas: Vec<String>,
 
-    status: u16,
+    status: String,
 
     #[serde(skip_serializing_if = "Option::is_none")]
     #[serde(rename = "scimType")]
@@ -194,8 +194,8 @@ pub struct Error {
 }
 
 impl Error {
-    pub fn new(
-        status: u16,
+    fn new(
+        status: StatusCode,
         error_type: Option<ErrorType>,
         detail: String,
     ) -> Self {
@@ -203,36 +203,69 @@ impl Error {
             schemas: vec![String::from(
                 "urn:ietf:params:scim:api:messages:2.0:Error",
             )],
-            status,
+            status: status.as_str().to_string(),
             error_type,
             detail,
         }
     }
 
     pub fn invalid_filter(detail: String) -> Self {
-        Self::new(400, Some(ErrorType::InvalidFilter), detail)
+        Self::new(
+            StatusCode::BAD_REQUEST,
+            Some(ErrorType::InvalidFilter),
+            detail,
+        )
     }
 
     pub fn not_found(id: String) -> Self {
-        Self::new(404, None, format!("Resource {id} not found"))
+        Self::new(
+            StatusCode::NOT_FOUND,
+            None,
+            format!("Resource {id} not found"),
+        )
     }
 
     pub fn conflict(identifier: String) -> Self {
         Self::new(
-            409,
+            StatusCode::CONFLICT,
             Some(ErrorType::Uniqueness),
             format!("Resource matching {identifier} exists already"),
         )
     }
 
     pub fn internal_error(detail: String) -> Self {
-        Self::new(500, None, detail)
+        Self::new(StatusCode::INTERNAL_SERVER_ERROR, None, detail)
+    }
+
+    pub fn status(&self) -> Result<u16, std::num::ParseIntError> {
+        self.status.parse()
     }
 
     pub fn to_http_response(self) -> Result<Response<Body>, http::Error> {
+        let status = match self.status() {
+            Ok(status) => status,
+
+            Err(e) => {
+                return Response::builder()
+                .status(500)
+                .header("Content-Type", "application/json")
+                .body(
+                    serde_json::json!(
+                        {
+                        "schemas": ["urn:ietf:params:scim:api:messages:2.0:Error"],
+                        "status": 500,
+                        "detail": format!("parsing {} as u16 failed: {e}", self.status),
+                        }
+                    )
+                    .to_string()
+                    .into(),
+                )
+            }
+        };
+
         match serde_json::to_string(&self) {
             Ok(serialized) => Response::builder()
-                .status(self.status)
+                .status(status)
                 .header("Content-Type", "application/json")
                 .body(serialized.into()),
 
