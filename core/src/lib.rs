@@ -31,3 +31,43 @@ pub use query_params::*;
 pub use resource::*;
 pub use response::*;
 pub use user::*;
+
+/// Skip serializing if optional list is None or empty
+pub fn skip_serializing_list<T>(members: &Option<Vec<T>>) -> bool {
+    match members {
+        None => true,
+        Some(v) => v.is_empty(),
+    }
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize, JsonSchema)]
+pub enum ResourceType {
+    User,
+    Group,
+}
+
+impl std::str::FromStr for ResourceType {
+    type Err = String;
+
+    fn from_str(r: &str) -> Result<Self, Self::Err> {
+        match r {
+            "User" => Ok(ResourceType::User),
+            "Group" => Ok(ResourceType::Group),
+            _ => Err(format!("{r} not a valid resource type")),
+        }
+    }
+}
+
+impl std::fmt::Display for ResourceType {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        match self {
+            ResourceType::User => {
+                write!(f, "User")
+            }
+
+            ResourceType::Group => {
+                write!(f, "Group")
+            }
+        }
+    }
+}

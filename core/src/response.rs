@@ -180,6 +180,9 @@ pub enum ErrorType {
 
     #[serde(rename = "uniqueness")]
     Uniqueness,
+
+    #[serde(rename = "invalidSyntax")]
+    InvalidSyntax,
 }
 
 /// The SCIM error format is specified in RFC 7644, section 3.12
@@ -238,6 +241,14 @@ impl Error {
 
     pub fn internal_error(detail: String) -> Self {
         Self::new(StatusCode::INTERNAL_SERVER_ERROR, None, detail)
+    }
+
+    pub fn invalid_syntax(detail: String) -> Self {
+        Self::new(
+            StatusCode::BAD_REQUEST,
+            Some(ErrorType::InvalidSyntax),
+            detail,
+        )
     }
 
     pub fn status(&self) -> Result<u16, std::num::ParseIntError> {

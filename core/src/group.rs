@@ -11,6 +11,8 @@ pub struct CreateGroupRequest {
 
     /// An identifier for the resource as defined by the provisioning client
     pub external_id: Option<String>,
+
+    pub members: Option<Vec<GroupMember>>,
 }
 
 #[derive(Serialize, Deserialize, JsonSchema, Clone, Debug, PartialEq)]
@@ -24,6 +26,9 @@ pub struct Group {
     // This is an OPTIONAL attribute, so skip serializing it if it's null.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub external_id: Option<String>,
+
+    #[serde(skip_serializing_if = "skip_serializing_list::<GroupMember>")]
+    pub members: Option<Vec<GroupMember>>,
 }
 
 impl Resource for Group {
@@ -41,7 +46,7 @@ impl Resource for Group {
 }
 
 /// A StoredGroup is one that combines the fields in Group and StoredMeta.
-#[derive(Clone, Serialize, JsonSchema)]
+#[derive(Clone, Serialize, JsonSchema, PartialEq)]
 pub struct StoredGroup {
     pub id: String,
     pub display_name: String,
@@ -51,20 +56,52 @@ pub struct StoredGroup {
     pub version: String,
 }
 
-impl From<StoredGroup> for StoredParts<Group> {
-    fn from(u: StoredGroup) -> StoredParts<Group> {
+impl StoredParts<Group> {
+    pub fn from(
+        g: StoredGroup,
+        members: Vec<StoredGroupMember>,
+    ) -> StoredParts<Group> {
         let group = Group {
-            id: u.id,
-            display_name: u.display_name,
-            external_id: u.external_id,
+            id: g.id,
+            display_name: g.display_name,
+            external_id: g.external_id,
+            members: Some(members.into_iter().map(|m| m.into()).collect()),
         };
 
         let meta = StoredMeta {
-            created: u.created,
-            last_modified: u.last_modified,
-            version: u.version,
+            created: g.created,
+            last_modified: g.last_modified,
+            version: g.version,
         };
 
         StoredParts { resource: group, meta }
+    }
+}
+
+#[derive(Serialize, Deserialize, JsonSchema, Clone, Debug, PartialEq)]
+pub struct GroupMember {
+    /// User or Group
+    #[serde(rename = "type")]
+    pub resource_type: Option<String>,
+
+    /// identifier of the member of this group
+    pub value: Option<String>,
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize, JsonSchema)]
+pub struct StoredGroupMember {
+    /// User or Group
+    pub resource_type: ResourceType,
+
+    /// identifier of the member of this group
+    pub value: String,
+}
+
+impl From<StoredGroupMember> for GroupMember {
+    fn from(m: StoredGroupMember) -> GroupMember {
+        GroupMember {
+            resource_type: Some(m.resource_type.to_string()),
+            value: Some(m.value),
+        }
     }
 }
