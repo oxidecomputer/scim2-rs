@@ -184,7 +184,7 @@ pub enum ErrorType {
 pub struct Error {
     schemas: Vec<String>,
 
-    status: u16,
+    status: String,
 
     #[serde(skip_serializing_if = "Option::is_none")]
     #[serde(rename = "scimType")]
@@ -203,7 +203,7 @@ impl Error {
             schemas: vec![String::from(
                 "urn:ietf:params:scim:api:messages:2.0:Error",
             )],
-            status,
+            status: status.to_string(),
             error_type,
             detail,
         }
@@ -229,10 +229,35 @@ impl Error {
         Self::new(500, None, detail)
     }
 
+    pub fn status(&self) -> Result<u16, std::num::ParseIntError> {
+        self.status.parse()
+    }
+
     pub fn to_http_response(self) -> Result<Response<Body>, http::Error> {
+        let status = match self.status() {
+            Ok(status) => status,
+
+            Err(e) => {
+                return Response::builder()
+                .status(500)
+                .header("Content-Type", "application/json")
+                .body(
+                    serde_json::json!(
+                        {
+                        "schemas": ["urn:ietf:params:scim:api:messages:2.0:Error"],
+                        "status": 500,
+                        "detail": format!("parsing {} as u16 failed: {e}", self.status),
+                        }
+                    )
+                    .to_string()
+                    .into(),
+                )
+            }
+        };
+
         match serde_json::to_string(&self) {
             Ok(serialized) => Response::builder()
-                .status(self.status)
+                .status(status)
                 .header("Content-Type", "application/json")
                 .body(serialized.into()),
 
