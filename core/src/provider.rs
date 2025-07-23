@@ -97,10 +97,18 @@ impl<T: ProviderStore> Provider<T> {
 
     pub async fn replace_user(
         &self,
-        _user_id: String,
-        _request: CreateUserRequest,
+        user_id: String,
+        request: CreateUserRequest,
     ) -> Result<SingleResourceResponse, Error> {
-        unimplemented!()
+        let stored_user =
+            self.store.replace_user(user_id.clone(), request).await.map_err(
+                err_with_context(format!(
+                    "replace user by id {user_id} failed!"
+                )),
+            )?;
+
+        let StoredParts { resource: user, meta } = stored_user.into();
+        SingleResourceResponse::from_resource(user, meta, None)
     }
 
     pub async fn delete_user(
@@ -170,10 +178,18 @@ impl<T: ProviderStore> Provider<T> {
 
     pub async fn replace_group(
         &self,
-        _group_id: String,
-        _request: CreateGroupRequest,
+        group_id: String,
+        request: CreateGroupRequest,
     ) -> Result<SingleResourceResponse, Error> {
-        unimplemented!()
+        let stored_group =
+            self.store.replace_group(group_id.clone(), request).await.map_err(
+                err_with_context(format!(
+                    "replace group by id {group_id} failed!"
+                )),
+            )?;
+
+        let StoredParts { resource: user, meta } = stored_group.into();
+        SingleResourceResponse::from_resource(user, meta, None)
     }
 
     pub async fn delete_group(

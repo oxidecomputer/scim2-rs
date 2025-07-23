@@ -32,3 +32,13 @@ pub struct StoredParts<R> {
     pub resource: R,
     pub meta: StoredMeta,
 }
+
+impl From<Meta> for StoredMeta {
+    fn from(m: Meta) -> StoredMeta {
+        StoredMeta {
+            created: m.created,
+            last_modified: m.last_modified,
+            version: m.version,
+        }
+    }
+}
