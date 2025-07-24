@@ -39,10 +39,8 @@ impl ListResponse {
 
         // TODO pagination should have happened before this, but fill in
         // start_index and items_per_page below based on query_params
-        let filter =
-            query_params.filter.clone().map(|f| parse_filter_param(&f));
 
-        let mut resources = resources
+        let resources = resources
             .into_iter()
             .map(|s| {
                 let StoredParts { resource, meta } = s.into();
@@ -56,12 +54,6 @@ impl ListResponse {
             .into_iter()
             .map(serialize_resource_to_object)
             .collect::<Result<Vec<_>, Error>>()?;
-
-        if let Some(filter) = filter {
-            if let Some(value) = apply_query_filter(&mut resources, filter) {
-                return value;
-            }
-        }
 
         Ok(ListResponse {
             schemas,
@@ -95,38 +87,6 @@ impl ListResponse {
                 ),
         }
     }
-}
-
-fn apply_query_filter(
-    resources: &mut Vec<serde_json::Map<String, serde_json::Value>>,
-    filter: FilterOp,
-) -> Option<Result<ListResponse, Error>> {
-    match filter {
-        FilterOp::UserEq(username) => {
-            resources.retain(|r| match r.get("userName") {
-                Some(value) => value
-                    .as_str()
-                    .map(|v| v.eq_ignore_ascii_case(&username))
-                    .unwrap_or(false),
-                None => false,
-            });
-        }
-        FilterOp::GroupEq(displayname) => {
-            resources.retain(|r| match r.get("displayName") {
-                Some(value) => value
-                    .as_str()
-                    .map(|v| v.eq_ignore_ascii_case(&displayname))
-                    .unwrap_or(false),
-                None => false,
-            });
-        }
-        FilterOp::Invalid => {
-            return Some(Err(Error::invalid_filter(
-                "invalid or unsupported filter".to_string(),
-            )));
-        }
-    }
-    None
 }
 
 #[derive(Deserialize, Serialize, JsonSchema, Debug)]

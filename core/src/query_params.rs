@@ -16,8 +16,8 @@ pub struct QueryParams {
 // the full filtering spec found in RFC 7644 Section 3.4.2.2.
 #[derive(Debug, PartialEq, Clone)]
 pub enum FilterOp {
-    UserEq(String),
-    GroupEq(String),
+    UserNameEq(String),
+    DisplayNameEq(String),
     Invalid,
 }
 
@@ -61,8 +61,8 @@ pub fn parse_filter_param(raw: &str) -> FilterOp {
     };
 
     match (parts[0], is_quoted_value(parts[1])) {
-        ("username", Some(value)) => FilterOp::UserEq(value),
-        ("displayname", Some(value)) => FilterOp::GroupEq(value),
+        ("username", Some(value)) => FilterOp::UserNameEq(value),
+        ("displayname", Some(value)) => FilterOp::DisplayNameEq(value),
         _ => FilterOp::Invalid,
     }
 }
@@ -75,12 +75,12 @@ mod test {
     fn test_user_eq_filter() {
         assert_eq!(
             parse_filter_param("userName Eq \"Mike\""),
-            FilterOp::UserEq("mike".to_string())
+            FilterOp::UserNameEq("mike".to_string())
         );
 
         assert_eq!(
             parse_filter_param("USERNAME eq \"JAMES\""),
-            FilterOp::UserEq("james".to_string())
+            FilterOp::UserNameEq("james".to_string())
         );
     }
 
@@ -88,12 +88,12 @@ mod test {
     fn test_group_eq_filter() {
         assert_eq!(
             parse_filter_param("displayName Eq \"PowerUsers\""),
-            FilterOp::GroupEq("powerusers".to_string())
+            FilterOp::DisplayNameEq("powerusers".to_string())
         );
 
         assert_eq!(
             parse_filter_param("dIsPlAyNaMe EQ \"Admins\""),
-            FilterOp::GroupEq("admins".to_string())
+            FilterOp::DisplayNameEq("admins".to_string())
         );
     }
 

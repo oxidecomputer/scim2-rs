@@ -13,4 +13,3 @@ dropshot.workspace = true
 http.workspace = true
 uuid.workspace = true
 chrono.workspace = true
-regex.workspace = true
