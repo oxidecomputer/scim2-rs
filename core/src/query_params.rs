@@ -41,7 +41,7 @@ pub fn parse_filter_param(raw: &str) -> FilterOp {
     // NOTE: We are currently only supporting a single `Eq` operator but we
     // may expand to support more filtering operators and expressions in the
     // future. Additionally we are explicitly looking for "userName" and
-    // "displayName" at this timea. In the future we should consider using the
+    // "displayName" at this time. In the future we should consider using the
     // winnow crate to properly parse these operations.
 
     let raw = raw.trim().to_lowercase();

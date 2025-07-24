@@ -106,7 +106,7 @@ fn apply_query_filter(
             resources.retain(|r| match r.get("userName") {
                 Some(value) => value
                     .as_str()
-                    .map(|v| v.to_lowercase() == username)
+                    .map(|v| v.eq_ignore_ascii_case(&username))
                     .unwrap_or(false),
                 None => false,
             });
@@ -115,7 +115,7 @@ fn apply_query_filter(
             resources.retain(|r| match r.get("displayName") {
                 Some(value) => value
                     .as_str()
-                    .map(|v| v.to_lowercase() == displayname)
+                    .map(|v| v.eq_ignore_ascii_case(&displayname))
                     .unwrap_or(false),
                 None => false,
             });
