@@ -27,10 +27,12 @@ pub trait ProviderStore: Sync {
         query_params: QueryParams,
     ) -> Result<Vec<StoredUser>, ProviderStoreError>;
 
+    // A Some(StoredUser) is returned if the User existed prior to the delete,
+    // otherwise None is returned.
     async fn delete_user_by_id(
         &self,
         user_id: String,
-    ) -> Result<(), ProviderStoreError>;
+    ) -> Result<Option<StoredUser>, ProviderStoreError>;
 
     async fn get_group_by_id(
         &self,
@@ -52,10 +54,12 @@ pub trait ProviderStore: Sync {
         query_params: QueryParams,
     ) -> Result<Vec<StoredGroup>, ProviderStoreError>;
 
+    // A Some(StoredGroup) is returned if the Group existed prior to the delete,
+    // otherwise None is returned.
     async fn delete_group_by_id(
         &self,
         group_id: String,
-    ) -> Result<(), ProviderStoreError>;
+    ) -> Result<Option<StoredGroup>, ProviderStoreError>;
 }
 
 /// The backing store for users and groups may throw its own error type, or it

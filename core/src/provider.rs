@@ -107,13 +107,18 @@ impl<T: ProviderStore> Provider<T> {
         &self,
         user_id: String,
     ) -> Result<Response<Body>, Error> {
-        self.store
-            .delete_user_by_id(user_id.clone())
-            .await
-            .map_err(err_with_context(format!(
-                "delete user by id {user_id} failed!"
-            )))
-            .map(|_| deleted_http_response())?
+        let maybe_stored_user =
+            self.store.delete_user_by_id(user_id.clone()).await.map_err(
+                err_with_context(format!(
+                    "delete user by id {user_id} failed!"
+                )),
+            )?;
+
+        match maybe_stored_user {
+            Some(_) => deleted_http_response(),
+
+            None => Err(Error::not_found(user_id)),
+        }
     }
 
     pub async fn list_groups(
@@ -175,12 +180,17 @@ impl<T: ProviderStore> Provider<T> {
         &self,
         group_id: String,
     ) -> Result<Response<Body>, Error> {
-        self.store
-            .delete_group_by_id(group_id.clone())
-            .await
-            .map_err(err_with_context(format!(
-                "delete group by id {group_id} failed!"
-            )))
-            .map(|_| deleted_http_response())?
+        let maybe_stored_group =
+            self.store.delete_group_by_id(group_id.clone()).await.map_err(
+                err_with_context(format!(
+                    "delete group by id {group_id} failed!"
+                )),
+            )?;
+
+        match maybe_stored_group {
+            Some(_) => deleted_http_response(),
+
+            None => Err(Error::not_found(group_id)),
+        }
     }
 }

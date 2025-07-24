@@ -4,7 +4,7 @@
 
 use super::*;
 
-#[derive(Serialize, JsonSchema, Clone, Debug)]
+#[derive(Deserialize, Serialize, JsonSchema, Clone, Debug)]
 #[serde(rename_all = "camelCase")]
 pub struct Meta {
     pub resource_type: String,

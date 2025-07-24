@@ -16,7 +16,6 @@ use dropshot::endpoint;
 use http::Response;
 use http::StatusCode;
 use schemars::JsonSchema;
-use scim2_rs::ProviderStore;
 use serde::Deserialize;
 use slog::Drain;
 use std::net::SocketAddr;
@@ -84,16 +83,6 @@ async fn main() -> anyhow::Result<()> {
     }
 
     let store = scim2_rs::InMemoryProviderStore::new();
-
-    // TODO temporarily create a user here until create endpoint works
-    store
-        .create_user(scim2_rs::CreateUserRequest {
-            name: String::from("dschrute@example.com"),
-            external_id: None,
-            active: Some(true),
-        })
-        .await
-        .unwrap();
 
     let ctx =
         Arc::new(ServerContext { provider: scim2_rs::Provider::new(store) });

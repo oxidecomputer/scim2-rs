@@ -79,10 +79,10 @@ impl ProviderStore for InMemoryProviderStore {
     async fn delete_user_by_id(
         &self,
         user_id: String,
-    ) -> Result<(), ProviderStoreError> {
+    ) -> Result<Option<StoredUser>, ProviderStoreError> {
         let mut users = self.users.lock().unwrap();
-        users.retain(|user| user.id != user_id);
-        Ok(())
+        let maybe_user = users.extract_if(.., |user| user.id == user_id).next();
+        Ok(maybe_user)
     }
 
     async fn get_group_by_id(
@@ -108,14 +108,6 @@ impl ProviderStore for InMemoryProviderStore {
         &self,
         group_request: CreateGroupRequest,
     ) -> Result<StoredGroup, ProviderStoreError> {
-        if self
-            .get_group_by_displayname(group_request.display_name.clone())
-            .await?
-            .is_some()
-        {
-            return Err(Error::conflict(group_request.display_name).into());
-        }
-
         let new_group = StoredGroup {
             id: Uuid::new_v4().to_string(),
             display_name: group_request.display_name,
@@ -142,9 +134,10 @@ impl ProviderStore for InMemoryProviderStore {
     async fn delete_group_by_id(
         &self,
         group_id: String,
-    ) -> Result<(), ProviderStoreError> {
+    ) -> Result<Option<StoredGroup>, ProviderStoreError> {
         let mut groups = self.groups.lock().unwrap();
-        groups.retain(|group| group.id != group_id);
-        Ok(())
+        let maybe_group =
+            groups.extract_if(.., |group| group.id == group_id).next();
+        Ok(maybe_group)
     }
 }
