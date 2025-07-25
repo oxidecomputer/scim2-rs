@@ -4,6 +4,8 @@
 
 use super::*;
 
+const CONTENT_TYPE_SCIM_JSON: &str = "application/scim+json";
+
 /// The generic response used to return a list of resources
 #[derive(Deserialize, Serialize, JsonSchema)]
 pub struct ListResponse {
@@ -68,12 +70,12 @@ impl ListResponse {
         match serde_json::to_string(&self) {
             Ok(serialized) => Response::builder()
                 .status(200)
-                .header("Content-Type", "application/json")
+                .header("Content-Type", CONTENT_TYPE_SCIM_JSON)
                 .body(serialized.into()),
 
             Err(e) => Response::builder()
                 .status(500)
-                .header("Content-Type", "application/json")
+                .header("Content-Type", CONTENT_TYPE_SCIM_JSON)
                 .body(
                     serde_json::json!(
                         {
@@ -148,12 +150,12 @@ impl SingleResourceResponse {
         match serde_json::to_string(&self) {
             Ok(serialized) => Response::builder()
                 .status(status_code)
-                .header("Content-Type", "application/json")
+                .header("Content-Type", CONTENT_TYPE_SCIM_JSON)
                 .body(serialized.into()),
 
             Err(e) => Response::builder()
                 .status(500)
-                .header("Content-Type", "application/json")
+                .header("Content-Type", CONTENT_TYPE_SCIM_JSON)
                 .body(
                     serde_json::json!(
                         {
@@ -249,7 +251,7 @@ impl Error {
             Err(e) => {
                 return Response::builder()
                 .status(500)
-                .header("Content-Type", "application/json")
+                .header("Content-Type", CONTENT_TYPE_SCIM_JSON)
                 .body(
                     serde_json::json!(
                         {
@@ -267,12 +269,12 @@ impl Error {
         match serde_json::to_string(&self) {
             Ok(serialized) => Response::builder()
                 .status(status)
-                .header("Content-Type", "application/json")
+                .header("Content-Type", CONTENT_TYPE_SCIM_JSON)
                 .body(serialized.into()),
 
             Err(e) => Response::builder()
                 .status(500)
-                .header("Content-Type", "application/json")
+                .header("Content-Type", CONTENT_TYPE_SCIM_JSON)
                 .body(
                     serde_json::json!(
                         {
@@ -291,7 +293,7 @@ impl Error {
 pub fn deleted_http_response() -> Result<Response<Body>, Error> {
     Response::builder()
         .status(StatusCode::NO_CONTENT)
-        .header("Content-Type", "application/json")
+        .header("Content-Type", CONTENT_TYPE_SCIM_JSON)
         .body(Body::empty())
         .map_err(|e| Error::internal_error(format!("{e}")))
 }
