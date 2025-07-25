@@ -210,3 +210,9 @@ impl<T: ProviderStore> Provider<T> {
         }
     }
 }
+
+impl Provider<InMemoryProviderStore> {
+    pub fn state(&self) -> InMemoryProviderStoreState {
+        self.store.state()
+    }
+}
