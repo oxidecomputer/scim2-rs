@@ -5,6 +5,7 @@
 use anyhow::Context;
 use anyhow::bail;
 use reqwest::StatusCode;
+use reqwest::Url;
 use reqwest::blocking::Client;
 use serde::Serialize;
 use serde::de::DeserializeOwned;
@@ -34,6 +35,8 @@ impl Tester {
         let jim = self.create_jim_user().context("create_jim_user")?;
 
         self.list_users_test(&dwight, &jim).context("list_users_test")?;
+        self.list_users_with_filter_test(&jim)
+            .context("list_users_with_filter_test")?;
 
         let _sales_reps =
             self.create_empty_group().context("create_empty_group")?;
@@ -242,6 +245,29 @@ impl Tester {
 
         if !users.contains(dwight) {
             bail!("users list does not contain dwight");
+        }
+
+        if !users.contains(jim) {
+            bail!("users list does not contain jim");
+        }
+
+        Ok(())
+    }
+
+    fn list_users_with_filter_test(&self, jim: &User) -> anyhow::Result<()> {
+        let mut url: Url = format!("{}/Users", self.url).parse().unwrap();
+        url.set_query(Some(&format!("filter=username eq \"{}\"", jim.name)));
+
+        let result = self.client.get(url).send()?;
+
+        if result.status() != StatusCode::OK {
+            bail!("listing users returned {}", result.status());
+        }
+
+        let users: Vec<User> = self.result_as_resource_list(result)?;
+
+        if users.len() != 1 {
+            bail!("users length is {}, not 1", users.len());
         }
 
         if !users.contains(jim) {

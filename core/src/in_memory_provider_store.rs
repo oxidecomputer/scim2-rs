@@ -70,10 +70,24 @@ impl ProviderStore for InMemoryProviderStore {
 
     async fn list_users(
         &self,
-        _query_params: QueryParams,
+        query_params: QueryParams,
     ) -> Result<Vec<StoredUser>, ProviderStoreError> {
         let users = self.users.lock().unwrap();
-        Ok(users.clone())
+        let mut users = users.clone();
+        if let Some(filter) = query_params.filter() {
+            match filter {
+                FilterOp::UserNameEq(username) => {
+                    users.retain(|u| u.name.eq_ignore_ascii_case(&username))
+                }
+                _ => {
+                    return Err(Error::invalid_filter(
+                        "invalid or unsupported filter".to_string(),
+                    )
+                    .into());
+                }
+            }
+        };
+        Ok(users)
     }
 
     async fn delete_user_by_id(
@@ -125,10 +139,24 @@ impl ProviderStore for InMemoryProviderStore {
 
     async fn list_groups(
         &self,
-        _query_params: QueryParams,
+        query_params: QueryParams,
     ) -> Result<Vec<StoredGroup>, ProviderStoreError> {
         let groups = self.groups.lock().unwrap();
-        Ok(groups.clone())
+        let mut groups = groups.clone();
+        if let Some(filter) = query_params.filter() {
+            match filter {
+                FilterOp::DisplayNameEq(display_name) => groups.retain(|g| {
+                    g.display_name.eq_ignore_ascii_case(&display_name)
+                }),
+                _ => {
+                    return Err(Error::invalid_filter(
+                        "invalid or unsupported filter".to_string(),
+                    )
+                    .into());
+                }
+            }
+        };
+        Ok(groups)
     }
 
     async fn delete_group_by_id(
