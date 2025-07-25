@@ -12,6 +12,12 @@ pub struct QueryParams {
     pub filter: Option<String>,
 }
 
+impl QueryParams {
+    pub fn filter(&self) -> Option<FilterOp> {
+        self.filter.as_ref().map(|f| parse_filter_param(f))
+    }
+}
+
 // These filter operations are exactly what Okta uses rather than implementing
 // the full filtering spec found in RFC 7644 Section 3.4.2.2.
 #[derive(Debug, PartialEq, Clone)]
@@ -21,7 +27,7 @@ pub enum FilterOp {
     Invalid,
 }
 
-pub fn parse_filter_param(raw: &str) -> FilterOp {
+fn parse_filter_param(raw: &str) -> FilterOp {
     // RFC 7644 - 3.4.2.2.  Filtering
     //
     // Attribute names and attribute operators used in filters are case

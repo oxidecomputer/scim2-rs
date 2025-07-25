@@ -74,9 +74,7 @@ impl ProviderStore for InMemoryProviderStore {
     ) -> Result<Vec<StoredUser>, ProviderStoreError> {
         let users = self.users.lock().unwrap();
         let mut users = users.clone();
-        if let Some(filter) =
-            query_params.filter.clone().map(|f| parse_filter_param(&f))
-        {
+        if let Some(filter) = query_params.filter() {
             match filter {
                 FilterOp::UserNameEq(username) => {
                     users.retain(|u| u.name.eq_ignore_ascii_case(&username))
@@ -145,9 +143,7 @@ impl ProviderStore for InMemoryProviderStore {
     ) -> Result<Vec<StoredGroup>, ProviderStoreError> {
         let groups = self.groups.lock().unwrap();
         let mut groups = groups.clone();
-        if let Some(filter) =
-            query_params.filter.clone().map(|f| parse_filter_param(&f))
-        {
+        if let Some(filter) = query_params.filter() {
             match filter {
                 FilterOp::DisplayNameEq(display_name) => groups.retain(|g| {
                     g.display_name.eq_ignore_ascii_case(&display_name)
