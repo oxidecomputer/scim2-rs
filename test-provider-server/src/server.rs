@@ -196,7 +196,7 @@ pub async fn get_service_provider_config(
                     "supported": false
                   },
                   "filter": {
-                    "supported": false
+                    "supported": true
                   },
                   "changePassword": {
                     "supported": false
