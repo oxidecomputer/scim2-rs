@@ -407,6 +407,46 @@ impl Tester {
             );
         }
 
+        // Leave out active and external id, and validate they don't change
+
+        let body = json!({
+            "userName": "jhalpert",
+        });
+
+        let result = self
+            .client
+            .put(format!("{}/Users/{}", self.url, jim.id))
+            .json(&body)
+            .send()?;
+
+        if result.status() != StatusCode::OK {
+            bail!(
+                "PUT returned {} instead of {}",
+                result.status(),
+                StatusCode::OK
+            );
+        }
+
+        {
+            let check_user: User = self.result_as_resource(result)?.resource;
+
+            if check_user.active != jim.active {
+                bail!(
+                    "active changed from {:?} to {:?}",
+                    jim.active,
+                    check_user.active
+                );
+            }
+
+            if check_user.external_id != jim.external_id {
+                bail!(
+                    "external_id changed from {:?} to {:?}",
+                    jim.external_id,
+                    check_user.external_id
+                );
+            }
+        }
+
         Ok(())
     }
 
@@ -512,7 +552,9 @@ impl Tester {
             parts.meta
         };
 
-        // Replace the existing group without the external ID
+        // Replace the existing group with the same name but without the
+        // external ID - this should keep the external ID that was there
+        // previously.
 
         let body = json!({
             "displayName": "Sales Reps",
@@ -540,16 +582,24 @@ impl Tester {
 
         let new_group: Group = self.result_as_resource(result)?.resource;
 
-        if new_group == *group {
-            bail!("group PUT didn't work, same group returned")
+        if new_group != *group {
+            bail!("group PUT didn't work, different group returned")
         }
 
-        // External ID should be cleared.
+        // External ID should be the same.
 
-        if new_group.external_id.is_some() {
+        let Some(new_group_external_id) = &new_group.external_id else {
             bail!(
-                "group's external ID should be None, its {:?}",
+                "group's external ID should be Some, its {:?}",
                 new_group.external_id
+            );
+        };
+
+        if Some(new_group_external_id) != group.external_id.as_ref() {
+            bail!(
+                "group's external ID changed from {:?} to {:?}",
+                group.external_id,
+                new_group.external_id,
             );
         }
 

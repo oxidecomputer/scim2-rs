@@ -56,6 +56,9 @@ impl ProviderStore for InMemoryProviderStore {
             id: Uuid::new_v4().to_string(),
             name: user_request.name,
             external_id: user_request.external_id,
+            // If the client doesn't assert `active`, then default to true: if
+            // an IdP doesn't use the `active` then we wouldn't want to have all
+            // users they provision be disabled.
             active: user_request.active.unwrap_or(true),
             created: Utc::now(),
             last_modified: Utc::now(),
@@ -134,32 +137,19 @@ impl ProviderStore for InMemoryProviderStore {
         // cleared, or the service provider MAY assign a default value to the
         // final resource representation.
 
+        // This code takes the stance: if a provisioning client doesn't assert a
+        // field, leave it alone: the IdP is the source of truth.
+
         let CreateUserRequest { name, active, external_id } = user_request;
 
         users[index].name = name;
 
-        match active {
-            Some(active) => {
-                users[index].active = active;
-            }
-
-            None => {
-                // XXX decide what to do if PUT doesn't assert active, it's
-                // readWrite. Maybe we should mimic the create user behaviour
-                // and set it to true?
-                //users[index].active = true;
-            }
+        if let Some(active) = active {
+            users[index].active = active;
         }
 
-        match external_id {
-            Some(external_id) => {
-                users[index].external_id = Some(external_id);
-            }
-
-            None => {
-                // If PUT doesn't assert external id, clear it.
-                users[index].external_id = None;
-            }
+        if let Some(external_id) = external_id {
+            users[index].external_id = Some(external_id);
         }
 
         Ok(users[index].clone())
@@ -263,15 +253,11 @@ impl ProviderStore for InMemoryProviderStore {
 
         groups[index].display_name = display_name;
 
-        match external_id {
-            Some(external_id) => {
-                groups[index].external_id = Some(external_id);
-            }
+        // This code takes the stance: if a provisioning client doesn't assert a
+        // field, leave it alone: the IdP is the source of truth.
 
-            None => {
-                // If PUT doesn't assert external id, clear it.
-                groups[index].external_id = None;
-            }
+        if let Some(external_id) = external_id {
+            groups[index].external_id = Some(external_id);
         }
 
         Ok(groups[index].clone())
