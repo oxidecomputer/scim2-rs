@@ -7,10 +7,15 @@ use super::*;
 use std::sync::Mutex;
 use uuid::Uuid;
 
+#[derive(Clone, Serialize, JsonSchema)]
+pub struct InMemoryProviderStoreState {
+    users: Vec<StoredUser>,
+    groups: Vec<StoredGroup>,
+}
+
 /// A non-optimized provider store implementation for use with tests
 pub struct InMemoryProviderStore {
-    users: Mutex<Vec<StoredUser>>,
-    groups: Mutex<Vec<StoredGroup>>,
+    state: Mutex<InMemoryProviderStoreState>,
 }
 
 impl Default for InMemoryProviderStore {
@@ -21,7 +26,16 @@ impl Default for InMemoryProviderStore {
 
 impl InMemoryProviderStore {
     pub fn new() -> Self {
-        Self { users: Mutex::new(vec![]), groups: Mutex::new(vec![]) }
+        Self {
+            state: Mutex::new(InMemoryProviderStoreState {
+                users: vec![],
+                groups: vec![],
+            }),
+        }
+    }
+
+    pub fn state(&self) -> InMemoryProviderStoreState {
+        self.state.lock().unwrap().clone()
     }
 }
 
@@ -31,16 +45,16 @@ impl ProviderStore for InMemoryProviderStore {
         &self,
         user_id: String,
     ) -> Result<Option<StoredUser>, ProviderStoreError> {
-        let users = self.users.lock().unwrap();
-        Ok(users.iter().find(|user| user.id == user_id).cloned())
+        let state = self.state.lock().unwrap();
+        Ok(state.users.iter().find(|user| user.id == user_id).cloned())
     }
 
     async fn get_user_by_username(
         &self,
         user_name: String,
     ) -> Result<Option<StoredUser>, ProviderStoreError> {
-        let users = self.users.lock().unwrap();
-        Ok(users.iter().find(|user| user.name == user_name).cloned())
+        let state = self.state.lock().unwrap();
+        Ok(state.users.iter().find(|user| user.name == user_name).cloned())
     }
 
     async fn create_user(
@@ -65,8 +79,8 @@ impl ProviderStore for InMemoryProviderStore {
             version: String::from("W/unimplemented"),
         };
 
-        let mut users = self.users.lock().unwrap();
-        users.push(new_user.clone());
+        let mut state = self.state.lock().unwrap();
+        state.users.push(new_user.clone());
 
         Ok(new_user)
     }
@@ -75,8 +89,9 @@ impl ProviderStore for InMemoryProviderStore {
         &self,
         query_params: QueryParams,
     ) -> Result<Vec<StoredUser>, ProviderStoreError> {
-        let users = self.users.lock().unwrap();
-        let mut users = users.clone();
+        let state = self.state.lock().unwrap();
+        let mut users = state.users.clone();
+
         if let Some(filter) = query_params.filter() {
             match filter {
                 FilterOp::UserNameEq(username) => {
@@ -90,6 +105,7 @@ impl ProviderStore for InMemoryProviderStore {
                 }
             }
         };
+
         Ok(users)
     }
 
@@ -98,7 +114,8 @@ impl ProviderStore for InMemoryProviderStore {
         user_id: String,
         user_request: CreateUserRequest,
     ) -> Result<StoredUser, ProviderStoreError> {
-        let mut users = self.users.lock().unwrap();
+        let mut state = self.state.lock().unwrap();
+        let users = &mut state.users;
 
         let index = match users.iter().position(|user| user.id == user_id) {
             None => {
@@ -159,8 +176,9 @@ impl ProviderStore for InMemoryProviderStore {
         &self,
         user_id: String,
     ) -> Result<Option<StoredUser>, ProviderStoreError> {
-        let mut users = self.users.lock().unwrap();
-        let maybe_user = users.extract_if(.., |user| user.id == user_id).next();
+        let mut state = self.state.lock().unwrap();
+        let maybe_user =
+            state.users.extract_if(.., |user| user.id == user_id).next();
         Ok(maybe_user)
     }
 
@@ -168,16 +186,17 @@ impl ProviderStore for InMemoryProviderStore {
         &self,
         group_id: String,
     ) -> Result<Option<StoredGroup>, ProviderStoreError> {
-        let groups = self.groups.lock().unwrap();
-        Ok(groups.iter().find(|group| group.id == group_id).cloned())
+        let state = self.state.lock().unwrap();
+        Ok(state.groups.iter().find(|group| group.id == group_id).cloned())
     }
 
     async fn get_group_by_displayname(
         &self,
         display_name: String,
     ) -> Result<Option<StoredGroup>, ProviderStoreError> {
-        let groups = self.groups.lock().unwrap();
-        Ok(groups
+        let state = self.state.lock().unwrap();
+        Ok(state
+            .groups
             .iter()
             .find(|group| group.display_name == display_name)
             .cloned())
@@ -196,8 +215,8 @@ impl ProviderStore for InMemoryProviderStore {
             version: String::from("W/unimplemented"),
         };
 
-        let mut groups = self.groups.lock().unwrap();
-        groups.push(new_group.clone());
+        let mut state = self.state.lock().unwrap();
+        state.groups.push(new_group.clone());
 
         Ok(new_group)
     }
@@ -206,8 +225,9 @@ impl ProviderStore for InMemoryProviderStore {
         &self,
         query_params: QueryParams,
     ) -> Result<Vec<StoredGroup>, ProviderStoreError> {
-        let groups = self.groups.lock().unwrap();
-        let mut groups = groups.clone();
+        let state = self.state.lock().unwrap();
+        let mut groups = state.groups.clone();
+
         if let Some(filter) = query_params.filter() {
             match filter {
                 FilterOp::DisplayNameEq(display_name) => groups.retain(|g| {
@@ -229,7 +249,8 @@ impl ProviderStore for InMemoryProviderStore {
         group_id: String,
         group_request: CreateGroupRequest,
     ) -> Result<StoredGroup, ProviderStoreError> {
-        let mut groups = self.groups.lock().unwrap();
+        let mut state = self.state.lock().unwrap();
+        let groups = &mut state.groups;
 
         let index = match groups.iter().position(|group| group.id == group_id) {
             None => {
@@ -267,9 +288,9 @@ impl ProviderStore for InMemoryProviderStore {
         &self,
         group_id: String,
     ) -> Result<Option<StoredGroup>, ProviderStoreError> {
-        let mut groups = self.groups.lock().unwrap();
+        let mut state = self.state.lock().unwrap();
         let maybe_group =
-            groups.extract_if(.., |group| group.id == group_id).next();
+            state.groups.extract_if(.., |group| group.id == group_id).next();
         Ok(maybe_group)
     }
 }

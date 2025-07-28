@@ -7,6 +7,7 @@ use dropshot::ApiDescription;
 use dropshot::Body;
 use dropshot::ConfigDropshot;
 use dropshot::HttpError;
+use dropshot::HttpResponseOk;
 use dropshot::HttpServerStarter;
 use dropshot::Path;
 use dropshot::Query;
@@ -52,7 +53,20 @@ fn register_endpoints(
     api_description.register(server::get_schemas)?;
     api_description.register(server::get_service_provider_config)?;
 
+    api_description.register(state)?;
+
     Ok(())
+}
+
+#[endpoint {
+    method = GET,
+    path = "/state"
+}]
+pub async fn state(
+    rqctx: RequestContext<Arc<ServerContext>>,
+) -> Result<HttpResponseOk<scim2_rs::InMemoryProviderStoreState>, HttpError> {
+    let apictx = rqctx.context();
+    Ok(HttpResponseOk(apictx.provider.state()))
 }
 
 #[derive(Debug, Parser)]

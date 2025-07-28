@@ -47,7 +47,7 @@ impl Resource for User {
 }
 
 /// A StoredUser is one that combines the fields in User and StoredMeta.
-#[derive(Clone)]
+#[derive(Clone, Serialize, JsonSchema)]
 pub struct StoredUser {
     pub id: String,
     pub name: String,
