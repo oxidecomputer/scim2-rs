@@ -125,3 +125,33 @@ pub async fn delete_user(
 
     result.map_err(HttpError::from)
 }
+
+#[derive(Deserialize, JsonSchema)]
+pub struct PatchUserPathParam {
+    user_id: String,
+}
+
+#[endpoint {
+    method = PATCH,
+    path = "/v2/Users/{user_id}"
+}]
+pub async fn patch_user(
+    rqctx: RequestContext<Arc<ServerContext>>,
+    // Fix path param type
+    path_param: Path<PatchUserPathParam>,
+    body: TypedBody<scim2_rs::PatchRequest>,
+) -> Result<Response<Body>, HttpError> {
+    let apictx = rqctx.context();
+    let path_param = path_param.into_inner();
+
+    let result: Result<Response<Body>, http::Error> = match apictx
+        .provider
+        .patch_user(path_param.user_id, body.into_inner())
+        .await
+    {
+        Ok(response) => response.to_http_response(StatusCode::OK),
+        Err(error) => error.to_http_response(),
+    };
+
+    result.map_err(HttpError::from)
+}

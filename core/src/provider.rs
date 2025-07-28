@@ -151,6 +151,28 @@ impl<T: ProviderStore> Provider<T> {
         SingleResourceResponse::from_resource(user, meta, None)
     }
 
+    pub async fn patch_user(
+        &self,
+        user_id: String,
+        request: PatchRequest,
+    ) -> Result<SingleResourceResponse, Error> {
+        let stored_user =
+            self.store.get_user_by_id(user_id.clone()).await.map_err(
+                err_with_context(format!("patch user by id {user_id} failed!")),
+            )?;
+
+        let Some(stored_user) = stored_user else {
+            return Err(Error::not_found(user_id));
+        };
+
+        let StoredUser { name, active, external_id, .. } =
+            request.apply_user_ops(&stored_user)?;
+        let request =
+            CreateUserRequest { name, active: Some(active), external_id };
+
+        self.replace_user(user_id, request).await
+    }
+
     pub async fn delete_user(
         &self,
         user_id: String,
@@ -367,6 +389,57 @@ impl<T: ProviderStore> Provider<T> {
 
             None => Err(Error::not_found(group_id)),
         }
+    }
+
+    pub async fn patch_group(
+        &self,
+        group_id: String,
+        request: PatchRequest,
+    ) -> Result<SingleResourceResponse, Error> {
+        let stored_group =
+            self.store.get_group_by_id(group_id.clone()).await.map_err(
+                err_with_context(format!(
+                    "patch group by id {group_id} failed!"
+                )),
+            )?;
+
+        let Some(stored_group) = stored_group else {
+            return Err(Error::not_found(group_id));
+        };
+
+        let StoredGroup { external_id, display_name, members, .. } =
+            request.apply_group_ops(&stored_group)?;
+        if members != stored_group.members {
+            // Verify that that the group members are real users before putting it
+            // back.
+            for member in &members {
+                self.store
+                    .get_user_by_id(member.value.clone())
+                    .await
+                    .map_err(err_with_context(format!(
+                        "patch group by id {group_id} failed!"
+                    )))?
+                    .ok_or(Error::invalid_syntax(format!(
+                        "user {} is not a valid user",
+                        member.value
+                    )))?;
+            }
+        }
+        let request = CreateGroupRequest {
+            display_name,
+            external_id,
+            members: Some(
+                members
+                    .iter()
+                    .map(|m| GroupMember {
+                        resource_type: Some(ResourceType::User.to_string()),
+                        value: Some(m.value.clone()),
+                    })
+                    .collect(),
+            ),
+        };
+
+        self.replace_group(group_id, request).await
     }
 }
 

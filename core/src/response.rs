@@ -251,6 +251,10 @@ impl Error {
         )
     }
 
+    pub fn not_implemented(detail: String) -> Self {
+        Self::new(StatusCode::NOT_IMPLEMENTED, None, detail)
+    }
+
     pub fn status(&self) -> Result<u16, std::num::ParseIntError> {
         self.status.parse()
     }
@@ -297,6 +301,17 @@ impl Error {
                     .to_string()
                     .into(),
                 ),
+        }
+    }
+}
+
+impl From<PatchRequestError> for Error {
+    fn from(value: PatchRequestError) -> Self {
+        match value {
+            PatchRequestError::Invalid(detail) => Error::invalid_syntax(detail),
+            PatchRequestError::Unsupported(detail) => {
+                Error::not_implemented(detail)
+            }
         }
     }
 }
