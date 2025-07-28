@@ -75,7 +75,8 @@ fn parse_filter_param(raw: &str) -> FilterOp {
 
 #[cfg(test)]
 mod test {
-    use crate::{FilterOp, parse_filter_param};
+    use super::parse_filter_param;
+    use crate::FilterOp;
 
     #[test]
     fn test_user_eq_filter() {
