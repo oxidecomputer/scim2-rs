@@ -213,6 +213,88 @@ impl<T: ProviderStore> Provider<T> {
         )
     }
 
+    async fn get_group_member(
+        &self,
+        member: &GroupMember,
+    ) -> Result<StoredGroupMember, Error> {
+        let GroupMember { resource_type, value } = member;
+
+        let Some(value) = value else {
+            // The minimum that this code needs is the value field so
+            // complain about that.
+            return Err(Error::invalid_syntax(String::from(
+                "group member missing value field",
+            )));
+        };
+
+        // Find the ID that this request is talking about, or 404
+        let resource_type = if let Some(resource_type) = resource_type {
+            let resource_type = ResourceType::from_str(resource_type)
+                .map_err(Error::invalid_syntax)?;
+
+            match resource_type {
+                ResourceType::User => {
+                    let maybe_user = self
+                        .store
+                        .get_user_by_id(value.clone())
+                        .await
+                        .map_err(err_with_context(
+                            "get_user_by_id".to_string(),
+                        ))?;
+
+                    if maybe_user.is_none() {
+                        return Err(Error::not_found(value.clone()));
+                    }
+                }
+
+                ResourceType::Group => {
+                    // don't support nested groups for now.
+                    return Err(Error::internal_error(
+                        "nested groups not supported".to_string(),
+                    ));
+                }
+            }
+
+            resource_type
+        } else {
+            let maybe_user =
+                self.store.get_user_by_id(value.clone()).await.map_err(
+                    err_with_context("get_group_members".to_string()),
+                )?;
+
+            let maybe_group =
+                self.store.get_group_by_id(value.clone()).await.map_err(
+                    err_with_context("get_group_members".to_string()),
+                )?;
+
+            match (maybe_user, maybe_group) {
+                (None, None) => {
+                    // 404
+                    return Err(Error::not_found(value.clone()));
+                }
+
+                (Some(_), None) => ResourceType::User,
+
+                (None, Some(_)) => {
+                    return Err(Error::internal_error(
+                        "nested groups not supported".to_string(),
+                    ));
+                }
+
+                (Some(_), Some(_)) => {
+                    return Err(Error::internal_error(format!(
+                        "{value} returned a user and group!"
+                    )));
+                }
+            }
+        };
+
+        let stored_member =
+            StoredGroupMember { resource_type, value: value.clone() };
+
+        Ok(stored_member)
+    }
+
     async fn get_group_members(
         &self,
         members: &[GroupMember],
@@ -221,82 +303,7 @@ impl<T: ProviderStore> Provider<T> {
             Vec::with_capacity(members.len());
 
         for member in members {
-            let GroupMember { resource_type, value } = member;
-
-            let Some(value) = value else {
-                // The minimum that this code needs is the value field so
-                // complain about that.
-                return Err(Error::invalid_syntax(String::from(
-                    "group member missing value field",
-                )));
-            };
-
-            // Find the ID that this request is talking about, or 404
-            let resource_type = if let Some(resource_type) = resource_type {
-                let resource_type = ResourceType::from_str(resource_type)
-                    .map_err(Error::invalid_syntax)?;
-
-                match resource_type {
-                    ResourceType::User => {
-                        let maybe_user = self
-                            .store
-                            .get_user_by_id(value.clone())
-                            .await
-                            .map_err(err_with_context(
-                                "get_user_by_id".to_string(),
-                            ))?;
-
-                        if maybe_user.is_none() {
-                            return Err(Error::not_found(value.clone()));
-                        }
-                    }
-
-                    ResourceType::Group => {
-                        // don't support nested groups for now.
-                        return Err(Error::internal_error(
-                            "nested groups not supported".to_string(),
-                        ));
-                    }
-                }
-
-                resource_type
-            } else {
-                let maybe_user =
-                    self.store.get_user_by_id(value.clone()).await.map_err(
-                        err_with_context("get_group_members".to_string()),
-                    )?;
-
-                let maybe_group =
-                    self.store.get_group_by_id(value.clone()).await.map_err(
-                        err_with_context("get_group_members".to_string()),
-                    )?;
-
-                match (maybe_user, maybe_group) {
-                    (None, None) => {
-                        // 404
-                        return Err(Error::not_found(value.clone()));
-                    }
-
-                    (Some(_), None) => ResourceType::User,
-
-                    (None, Some(_)) => {
-                        return Err(Error::internal_error(
-                            "nested groups not supported".to_string(),
-                        ));
-                    }
-
-                    (Some(_), Some(_)) => {
-                        return Err(Error::internal_error(format!(
-                            "{value} returned a user and group!"
-                        )));
-                    }
-                }
-            };
-
-            let stored_member =
-                StoredGroupMember { resource_type, value: value.clone() };
-
-            stored_members.push(stored_member);
+            stored_members.push(self.get_group_member(member).await?);
         }
 
         Ok(stored_members)
