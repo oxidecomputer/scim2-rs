@@ -44,10 +44,14 @@ impl Tester {
 
         self.replace_user_test(&jim).context("replace_user_test")?;
 
+        self.patch_user_test(&jim).context("patch_user_test")?;
+
         let sales_reps =
             self.create_empty_group().context("create_empty_group")?;
 
         self.replace_group_test(&sales_reps).context("replace_group_test")?;
+
+        self.patch_group_test(&sales_reps).context("patch_user_test")?;
 
         self.test_groups(&dwight, &jim).context("test_groups")?;
 
@@ -346,6 +350,63 @@ impl Tester {
         if !users.contains(jim) {
             bail!("users list does not contain jim");
         }
+
+        Ok(())
+    }
+
+    fn patch_user_test(&self, jim: &User) -> anyhow::Result<()> {
+        let url: Url =
+            format!("{}/Users/{}", self.url, jim.id).parse().unwrap();
+
+        // Set the users active field to false
+        let body = json!(
+            {
+              "schemas": [
+                "urn:ietf:params:scim:api:messages:2.0:PatchOp"
+              ],
+              "Operations": [
+                {
+                  "op": "replace",
+                  "value": {
+                    "active": false
+                  }
+                }
+              ]
+            }
+        );
+
+        let result = self.client.patch(url.clone()).json(&body).send()?;
+        let jim: StoredParts<User> = self.result_as_resource(result)?;
+
+        if jim.resource.active != Some(false) {
+            bail!("users active field is not false",);
+        }
+
+        // Set the users active field to true
+        let body = json!(
+            {
+              "schemas": [
+                "urn:ietf:params:scim:api:messages:2.0:PatchOp"
+              ],
+              "Operations": [
+                {
+                  "op": "replace",
+                  "value": {
+                    "active": true
+                  }
+                }
+              ]
+            }
+        );
+
+        let result = self.client.patch(url).json(&body).send()?;
+        let jim: StoredParts<User> = self.result_as_resource(result)?;
+
+        if jim.resource.active != Some(true) {
+            bail!("users active field is not true",);
+        }
+
+        // TODO Add some tests with invalid patch syntax
 
         Ok(())
     }
@@ -708,6 +769,77 @@ impl Tester {
 
         if old_group != *group {
             bail!("group revert PUT didn't work, new group returned")
+        }
+
+        Ok(())
+    }
+
+    fn patch_group_test(&self, group: &Group) -> anyhow::Result<()> {
+        let new_display_name = "Radiants";
+        // Use a patch request to modify the groups displayName.
+        let body = json!({
+          "schemas": [
+            "urn:ietf:params:scim:api:messages:2.0:PatchOp"
+          ],
+          "Operations": [
+            {
+              "op": "replace",
+              "value": {
+                "id": group.id,
+                "displayName": new_display_name,
+              }
+            }
+          ]
+        });
+
+        let result = self
+            .client
+            .patch(format!("{}/Groups/{}", self.url, group.id))
+            .json(&body)
+            .send()?;
+        let patched_group: StoredParts<Group> =
+            self.result_as_resource(result)?;
+
+        // Make sure the group displayName has changed
+
+        if patched_group.resource.display_name != new_display_name {
+            bail!(
+                "group displayName is {} but should be {new_display_name}",
+                patched_group.resource.display_name
+            )
+        }
+
+        // Set the displayName back to what it was
+        let body = json!({
+          "schemas": [
+            "urn:ietf:params:scim:api:messages:2.0:PatchOp"
+          ],
+          "Operations": [
+            {
+              "op": "replace",
+              "value": {
+                "id": group.id,
+                "displayName": group.display_name,
+              }
+            }
+          ]
+        });
+
+        let result = self
+            .client
+            .patch(format!("{}/Groups/{}", self.url, group.id))
+            .json(&body)
+            .send()?;
+        let patched_group: StoredParts<Group> =
+            self.result_as_resource(result)?;
+
+        // Make sure the group displayName was reverted
+
+        if patched_group.resource.display_name != group.display_name {
+            bail!(
+                "group displayName is {} but should be {new_display_name}",
+                patched_group.resource.display_name
+            )
         }
 
         Ok(())

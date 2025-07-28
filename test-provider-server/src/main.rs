@@ -40,12 +40,14 @@ fn register_endpoints(
     api_description.register(users::create_user)?;
     api_description.register(users::put_user)?;
     api_description.register(users::delete_user)?;
+    api_description.register(users::patch_user)?;
 
     api_description.register(groups::list_groups)?;
     api_description.register(groups::get_group)?;
     api_description.register(groups::create_group)?;
     api_description.register(groups::put_group)?;
     api_description.register(groups::delete_group)?;
+    api_description.register(groups::patch_group)?;
 
     api_description.register(server::get_resource_types)?;
     api_description.register(server::get_resource_type_user)?;

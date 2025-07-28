@@ -126,3 +126,32 @@ pub async fn delete_group(
 
     result.map_err(HttpError::from)
 }
+
+#[derive(Deserialize, JsonSchema)]
+pub struct PatchGroupPathParam {
+    group_id: String,
+}
+
+#[endpoint {
+    method = PATCH,
+    path = "/v2/Groups/{group_id}"
+}]
+pub async fn patch_group(
+    rqctx: RequestContext<Arc<ServerContext>>,
+    path_param: Path<PatchGroupPathParam>,
+    body: TypedBody<scim2_rs::PatchRequest>,
+) -> Result<Response<Body>, HttpError> {
+    let apictx = rqctx.context();
+    let path_param = path_param.into_inner();
+
+    let result: Result<Response<Body>, http::Error> = match apictx
+        .provider
+        .patch_group(path_param.group_id, body.into_inner())
+        .await
+    {
+        Ok(response) => response.to_http_response(StatusCode::OK),
+        Err(error) => error.to_http_response(),
+    };
+
+    result.map_err(HttpError::from)
+}
