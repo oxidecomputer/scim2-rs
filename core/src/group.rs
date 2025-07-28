@@ -13,7 +13,7 @@ pub struct CreateGroupRequest {
     pub external_id: Option<String>,
 }
 
-#[derive(Serialize, Deserialize, JsonSchema, Clone, Debug)]
+#[derive(Serialize, Deserialize, JsonSchema, Clone, Debug, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct Group {
     pub id: String,
@@ -41,7 +41,7 @@ impl Resource for Group {
 }
 
 /// A StoredGroup is one that combines the fields in Group and StoredMeta.
-#[derive(Clone)]
+#[derive(Clone, Serialize, JsonSchema)]
 pub struct StoredGroup {
     pub id: String,
     pub display_name: String,

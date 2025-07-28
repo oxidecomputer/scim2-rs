@@ -27,6 +27,12 @@ pub trait ProviderStore: Sync {
         query_params: QueryParams,
     ) -> Result<Vec<StoredUser>, ProviderStoreError>;
 
+    async fn replace_user(
+        &self,
+        user_id: String,
+        user_request: CreateUserRequest,
+    ) -> Result<StoredUser, ProviderStoreError>;
+
     // A Some(StoredUser) is returned if the User existed prior to the delete,
     // otherwise None is returned.
     async fn delete_user_by_id(
@@ -53,6 +59,12 @@ pub trait ProviderStore: Sync {
         &self,
         query_params: QueryParams,
     ) -> Result<Vec<StoredGroup>, ProviderStoreError>;
+
+    async fn replace_group(
+        &self,
+        group_id: String,
+        group_request: CreateGroupRequest,
+    ) -> Result<StoredGroup, ProviderStoreError>;
 
     // A Some(StoredGroup) is returned if the Group existed prior to the delete,
     // otherwise None is returned.
