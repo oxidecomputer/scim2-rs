@@ -183,16 +183,7 @@ impl<T: ProviderStore> Provider<T> {
             Vec::with_capacity(stored_groups.len());
 
         for stored_group in stored_groups {
-            let stored_members = self
-                .store
-                .get_group_members(stored_group.id.clone())
-                .await
-                .map_err(err_with_context(
-                    "get_group_members failed!".to_string(),
-                ))?;
-
-            groups
-                .push(StoredParts::<Group>::from(stored_group, stored_members));
+            groups.push(StoredParts::<Group>::from(stored_group));
         }
 
         ListResponse::from_resources(groups, query_params)
@@ -212,16 +203,8 @@ impl<T: ProviderStore> Provider<T> {
             return Err(Error::not_found(group_id));
         };
 
-        let stored_members = self
-            .store
-            .get_group_members(stored_group.id.clone())
-            .await
-            .map_err(err_with_context(
-                "get_group_members failed!".to_string(),
-            ))?;
-
         let StoredParts { resource: group, meta } =
-            StoredParts::<Group>::from(stored_group, stored_members);
+            StoredParts::<Group>::from(stored_group);
 
         SingleResourceResponse::from_resource::<Group>(
             group,
@@ -336,7 +319,7 @@ impl<T: ProviderStore> Provider<T> {
             .map_err(err_with_context("create group failed!".to_string()))?;
 
         let StoredParts { resource: group, meta } =
-            StoredParts::<Group>::from(stored_group, stored_members);
+            StoredParts::<Group>::from(stored_group);
         SingleResourceResponse::from_resource(group, meta, None)
     }
 
@@ -364,7 +347,7 @@ impl<T: ProviderStore> Provider<T> {
             )))?;
 
         let StoredParts { resource: group, meta } =
-            StoredParts::<Group>::from(stored_group, stored_members);
+            StoredParts::<Group>::from(stored_group);
         SingleResourceResponse::from_resource(group, meta, None)
     }
 

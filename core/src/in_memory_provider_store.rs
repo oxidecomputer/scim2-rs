@@ -4,7 +4,6 @@
 
 use super::*;
 
-use std::collections::BTreeMap;
 use std::sync::Mutex;
 use uuid::Uuid;
 
@@ -12,9 +11,6 @@ use uuid::Uuid;
 pub struct InMemoryProviderStoreState {
     users: Vec<StoredUser>,
     groups: Vec<StoredGroup>,
-
-    /// Map group id to a list of members
-    group_memberships: BTreeMap<String, Vec<StoredGroupMember>>,
 }
 
 /// A non-optimized provider store implementation for use with tests
@@ -34,7 +30,6 @@ impl InMemoryProviderStore {
             state: Mutex::new(InMemoryProviderStoreState {
                 users: vec![],
                 groups: vec![],
-                group_memberships: BTreeMap::default(),
             }),
         }
     }
@@ -222,14 +217,11 @@ impl ProviderStore for InMemoryProviderStore {
             created: Utc::now(),
             last_modified: Utc::now(),
             version: String::from("W/unimplemented"),
+            members,
         };
 
         let mut state = self.state.lock().unwrap();
         state.groups.push(new_group.clone());
-
-        assert!(!state.group_memberships.contains_key(&new_group.id));
-
-        state.group_memberships.insert(new_group.id.clone(), members);
 
         Ok(new_group)
     }
@@ -296,8 +288,7 @@ impl ProviderStore for InMemoryProviderStore {
             state.groups[index].external_id = Some(external_id);
         }
 
-        // Update the members: replace all the old ones
-        let _existing = state.group_memberships.insert(group_id, members);
+        state.groups[index].members = members;
 
         Ok(state.groups[index].clone())
     }
@@ -309,10 +300,6 @@ impl ProviderStore for InMemoryProviderStore {
         let mut state = self.state.lock().unwrap();
         let maybe_group =
             state.groups.extract_if(.., |group| group.id == group_id).next();
-
-        if let Some(group) = &maybe_group {
-            let _existing = state.group_memberships.remove(&group.id);
-        }
 
         Ok(maybe_group)
     }
@@ -327,21 +314,15 @@ impl ProviderStore for InMemoryProviderStore {
 
         let mut user_group_members = vec![];
 
-        for (group_id, memberships) in state.group_memberships.iter() {
-            if memberships.iter().any(|item| {
+        for group in state.groups.iter() {
+            if group.members.iter().any(|item| {
                 item.resource_type == ResourceType::User
                     && item.value == user_id
             }) {
-                let idx = state
-                    .groups
-                    .iter()
-                    .position(|group| group.id == *group_id)
-                    .ok_or(Error::not_found(group_id.clone()))?;
-
                 user_group_members.push(UserGroup {
                     member_type: Some(UserGroupType::Direct),
-                    value: Some(group_id.clone()),
-                    display: Some(state.groups[idx].display_name.clone()),
+                    value: Some(group.id.clone()),
+                    display: Some(group.display_name.clone()),
                 });
             }
         }
@@ -356,9 +337,15 @@ impl ProviderStore for InMemoryProviderStore {
     ) -> Result<Vec<StoredGroupMember>, ProviderStoreError> {
         let state = self.state.lock().unwrap();
 
-        match state.group_memberships.get(&group_id) {
-            Some(members) => Ok(members.clone()),
-            None => Err(Error::not_found(group_id).into()),
-        }
+        let index =
+            match state.groups.iter().position(|group| group.id == group_id) {
+                None => {
+                    return Err(Error::not_found(group_id).into());
+                }
+
+                Some(index) => index,
+            };
+
+        Ok(state.groups[index].members.clone())
     }
 }

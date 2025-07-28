@@ -54,18 +54,16 @@ pub struct StoredGroup {
     pub created: DateTime<Utc>,
     pub last_modified: DateTime<Utc>,
     pub version: String,
+    pub members: Vec<StoredGroupMember>,
 }
 
 impl StoredParts<Group> {
-    pub fn from(
-        g: StoredGroup,
-        members: Vec<StoredGroupMember>,
-    ) -> StoredParts<Group> {
+    pub fn from(g: StoredGroup) -> StoredParts<Group> {
         let group = Group {
             id: g.id,
             display_name: g.display_name,
             external_id: g.external_id,
-            members: Some(members.into_iter().map(|m| m.into()).collect()),
+            members: Some(g.members.into_iter().map(|m| m.into()).collect()),
         };
 
         let meta = StoredMeta {
