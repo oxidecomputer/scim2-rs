@@ -376,6 +376,22 @@ impl Tester {
         );
 
         let result = self.client.patch(url.clone()).json(&body).send()?;
+
+        // RFC 7664 § 3.5.2:
+        // On successful completion, the server either MUST return a 200 OK
+        // response code and the entire resource within the response body,
+        // subject to the "attributes" query parameter (see Section 3.9), or MAY
+        // return HTTP status code 204 (No Content) and the appropriate response
+        // headers for a successful PATCH request.  The server MUST return a 200
+        // OK if the "attributes" parameter is specified in the request.
+        if result.status() != StatusCode::OK {
+            bail!(
+                "PATCH returned {} instead of {}",
+                result.status(),
+                StatusCode::OK
+            );
+        }
+
         let jim: StoredParts<User> = self.result_as_resource(result)?;
 
         if jim.resource.active != Some(false) {

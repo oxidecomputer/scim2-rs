@@ -137,7 +137,6 @@ pub struct PatchUserPathParam {
 }]
 pub async fn patch_user(
     rqctx: RequestContext<Arc<ServerContext>>,
-    // Fix path param type
     path_param: Path<PatchUserPathParam>,
     body: TypedBody<scim2_rs::PatchRequest>,
 ) -> Result<Response<Body>, HttpError> {
