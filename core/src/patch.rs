@@ -237,77 +237,107 @@ fn apply_group_remove_op(
 mod test {
     use serde_json::json;
 
-    use crate::PatchRequest;
+    use crate::{
+        PatchRequest,
+        patch::{GroupRemoveOp, parse_remove_path},
+    };
 
     #[test]
     fn test_parse_user_active_replace_op() {
-        let json = json!(
+        let json = json!({
+          "schemas": [
+            "urn:ietf:params:scim:api:messages:2.0:PatchOp"
+          ],
+          "Operations": [
             {
-              "schemas": [
-                "urn:ietf:params:scim:api:messages:2.0:PatchOp"
-              ],
-              "Operations": [
-                {
-                  "op": "replace",
-                  "value": {
-                    "active": false
-                  }
-                }
-              ]
+              "op": "replace",
+              "value": {
+                "active": false
+              }
             }
-        );
+          ]
+        });
 
         serde_json::from_value::<PatchRequest>(json).unwrap();
     }
 
     #[test]
     fn test_parse_group_displayname_replace_op() {
-        let json = json!(
+        let json = json!({
+          "schemas": [
+            "urn:ietf:params:scim:api:messages:2.0:PatchOp"
+          ],
+          "Operations": [
             {
-              "schemas": [
-                "urn:ietf:params:scim:api:messages:2.0:PatchOp"
-              ],
-              "Operations": [
-                {
-                  "op": "replace",
-                  "value": {
-                    "id": "abf4dd94-a4c0-4f67-89c9-76b03340cb9b",
-                    "displayName": "Test SCIMv2"
-                  }
-                }
-              ]
+              "op": "replace",
+              "value": {
+                "id": "abf4dd94-a4c0-4f67-89c9-76b03340cb9b",
+                "displayName": "Test SCIMv2"
+              }
             }
-        );
+          ]
+        });
 
         serde_json::from_value::<PatchRequest>(json).unwrap();
     }
 
     #[test]
     fn test_parse_group_membership_ops() {
-        let json = json!(
+        let json = json!({
+          "schemas": [
+            "urn:ietf:params:scim:api:messages:2.0:PatchOp"
+          ],
+          "Operations": [
             {
-              "schemas": [
-                "urn:ietf:params:scim:api:messages:2.0:PatchOp"
-              ],
-              "Operations": [
+              "op": "remove",
+              "path": "members[value eq \"89bb1940-b905-4575-9e7f-6f887cfb368e\"]"
+            },
+            {
+              "op": "add",
+              "path": "members",
+              "value": [
                 {
-                  "op": "remove",
-                  "path": "members[value eq \"89bb1940-b905-4575-9e7f-6f887cfb368e\"]"
-                },
-                {
-                  "op": "add",
-                  "path": "members",
-                  "value": [
-                    {
-                      "value": "23a35c27-23d3-4c03-b4c5-6443c09e7173",
-                      "display": "test.user@okta.local"
-                    }
-                  ]
+                  "value": "23a35c27-23d3-4c03-b4c5-6443c09e7173",
+                  "display": "test.user@okta.local"
                 }
               ]
             }
-        );
+          ]
+        });
 
         serde_json::from_value::<PatchRequest>(json).unwrap();
+    }
+
+    #[test]
+    fn test_parse_remove_path() {
+        // The value we expect an IdP to send
+        let user_id = "89bb1940-b905-4575-9e7f-6f887cfb368e".to_string();
+        let path = format!("members[value eq \"{user_id}\"]");
+        assert!(matches!(
+            parse_remove_path(&path).unwrap(),
+            GroupRemoveOp::Indvidual(value) if value == user_id,
+        ));
+
+        // The value we expec an Idp to send but with mixed case
+        let user_id = "89bb1940-b905-4575-9e7f-6f887cfb368e".to_string();
+        let path = format!("MemBers[value EQ \"{user_id}\"]");
+        assert!(matches!(
+            parse_remove_path(&path).unwrap(),
+            GroupRemoveOp::Indvidual(value) if value == user_id,
+        ));
+
+        // Remove all members
+        let path = "members";
+        assert!(
+            matches!(parse_remove_path(path).unwrap(), GroupRemoveOp::All,)
+        );
+
+        // An unsupported value
+        let path = "members[value eq \"2819c223-7f76-453a-919d-413861904646\"].displayName";
+        assert!(parse_remove_path(path).is_err());
+
+        // An unsupported value
+        let path = "addresses[type eq \"work\"]";
+        assert!(parse_remove_path(path).is_err());
     }
 }
