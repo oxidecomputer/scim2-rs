@@ -7,6 +7,7 @@ use anyhow::bail;
 use reqwest::StatusCode;
 use reqwest::Url;
 use reqwest::blocking::Client;
+use scim2_rs::GroupMember;
 use serde::Serialize;
 use serde::de::DeserializeOwned;
 use serde_json::json;
@@ -51,7 +52,8 @@ impl Tester {
 
         self.replace_group_test(&sales_reps).context("replace_group_test")?;
 
-        self.patch_group_test(&sales_reps).context("patch_user_test")?;
+        self.patch_group_test(&sales_reps, &jim, &dwight)
+            .context("patch_user_test")?;
 
         self.test_groups(&dwight, &jim).context("test_groups")?;
 
@@ -790,7 +792,12 @@ impl Tester {
         Ok(())
     }
 
-    fn patch_group_test(&self, group: &Group) -> anyhow::Result<()> {
+    fn patch_group_test(
+        &self,
+        group: &Group,
+        jim: &User,
+        dwight: &User,
+    ) -> anyhow::Result<()> {
         let new_display_name = "Radiants";
         // Use a patch request to modify the groups displayName.
         let body = json!({
@@ -857,6 +864,190 @@ impl Tester {
                 patched_group.resource.display_name
             )
         }
+
+        // Grab a handle to the stored group
+
+        let result = self
+            .client
+            .get(format!("{}/Groups/{}", self.url, group.id))
+            .send()?;
+
+        let stored_group: StoredParts<Group> =
+            self.result_as_resource(result)?;
+
+        // Make sure we are starting with an empty group member list
+
+        if !stored_group
+            .resource
+            .members
+            .as_deref()
+            .unwrap_or_default()
+            .is_empty()
+        {
+            bail!(
+                "group members should be empty but found: {:?}",
+                stored_group.resource.members
+            )
+        }
+
+        // Add the Jim and Dwight users in single PATCH request
+
+        let body = json!({
+          "schemas": [
+            "urn:ietf:params:scim:api:messages:2.0:PatchOp"
+          ],
+          "Operations": [
+            {
+              "op": "add",
+              "path": "members",
+              "value": [
+                {
+                  "value": jim.id,
+                  "display": jim.name
+                },
+                {
+                  "value": dwight.id,
+                  "display": dwight.name
+                }
+              ]
+            }
+          ]
+        });
+
+        let result = self
+            .client
+            .patch(format!("{}/Groups/{}", self.url, group.id))
+            .json(&body)
+            .send()?;
+        let patched_group: StoredParts<Group> =
+            self.result_as_resource(result)?;
+
+        if !patched_group
+            .resource
+            .members
+            .as_deref()
+            .unwrap_or_default()
+            .contains(&GroupMember {
+                resource_type: Some(ResourceType::User.to_string()),
+                value: Some(jim.id.clone()),
+            })
+        {
+            bail!(
+                "group members should contain {} but found {:?}",
+                jim.id,
+                patched_group.resource.members
+            );
+        }
+
+        if !patched_group
+            .resource
+            .members
+            .as_deref()
+            .unwrap_or_default()
+            .contains(&GroupMember {
+                resource_type: Some(ResourceType::User.to_string()),
+                value: Some(dwight.id.clone()),
+            })
+        {
+            bail!(
+                "group members should contain {} but found {:?}",
+                dwight.id,
+                patched_group.resource.members
+            );
+        }
+
+        // Remove just the Jim user
+        //
+        let body = json!({
+          "schemas": [
+            "urn:ietf:params:scim:api:messages:2.0:PatchOp"
+          ],
+          "Operations": [
+            {
+              "op": "remove",
+              "path": format!("members[value eq \"{}\"]", jim.id)
+            }
+          ]
+        });
+
+        let result = self
+            .client
+            .patch(format!("{}/Groups/{}", self.url, group.id))
+            .json(&body)
+            .send()?;
+
+        let patched_group: StoredParts<Group> =
+            self.result_as_resource(result)?;
+
+        if patched_group
+            .resource
+            .members
+            .as_deref()
+            .unwrap_or_default()
+            .contains(&GroupMember {
+                resource_type: Some(ResourceType::User.to_string()),
+                value: Some(jim.id.clone()),
+            })
+        {
+            bail!(
+                "group members should not contain {} but found {:?}",
+                jim.id,
+                patched_group.resource.members
+            );
+        }
+
+        if patched_group.resource.members.as_deref().unwrap_or_default().len()
+            != 1
+        {
+            bail!(
+                "group members should only contain 1 member but found {}",
+                patched_group
+                    .resource
+                    .members
+                    .as_deref()
+                    .unwrap_or_default()
+                    .len()
+            );
+        }
+
+        // Clear all group members
+
+        let body = json!({
+          "schemas": [
+            "urn:ietf:params:scim:api:messages:2.0:PatchOp"
+          ],
+          "Operations": [
+            {
+              "op": "remove",
+              "path": "members"
+            }
+          ]
+        });
+
+        let result = self
+            .client
+            .patch(format!("{}/Groups/{}", self.url, group.id))
+            .json(&body)
+            .send()?;
+
+        let patched_group: StoredParts<Group> =
+            self.result_as_resource(result)?;
+
+        if !patched_group
+            .resource
+            .members
+            .as_deref()
+            .unwrap_or_default()
+            .is_empty()
+        {
+            bail!(
+                "group members should be empty but found: {:?}",
+                stored_group.resource.members
+            )
+        }
+
+        // TODO write a test when scim2-rs#24 is addressed that attempts to add
+        // the same user to a group multiple times
 
         Ok(())
     }
