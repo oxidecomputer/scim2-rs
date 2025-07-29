@@ -53,7 +53,7 @@ impl Tester {
         self.replace_group_test(&sales_reps).context("replace_group_test")?;
 
         self.patch_group_test(&sales_reps, &jim, &dwight)
-            .context("patch_user_test")?;
+            .context("patch_group_test")?;
 
         self.test_groups(&dwight, &jim).context("test_groups")?;
 
