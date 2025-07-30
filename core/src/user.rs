@@ -4,7 +4,7 @@
 
 use super::*;
 
-#[derive(Deserialize, JsonSchema)]
+#[derive(Deserialize, JsonSchema, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct CreateUserRequest {
     #[serde(rename = "userName")]
