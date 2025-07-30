@@ -93,7 +93,7 @@ impl std::str::FromStr for UserGroupType {
     type Err = String;
 
     fn from_str(r: &str) -> Result<Self, Self::Err> {
-        match r {
+        match r.to_lowercase().as_str() {
             "direct" => Ok(UserGroupType::Direct),
             "indirect" => Ok(UserGroupType::Indirect),
             _ => Err(format!("{r} not a valid UserGroupType")),

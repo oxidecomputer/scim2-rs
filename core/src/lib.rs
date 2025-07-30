@@ -50,9 +50,9 @@ impl std::str::FromStr for ResourceType {
     type Err = String;
 
     fn from_str(r: &str) -> Result<Self, Self::Err> {
-        match r {
-            "User" => Ok(ResourceType::User),
-            "Group" => Ok(ResourceType::Group),
+        match r.to_lowercase().as_str() {
+            "user" => Ok(ResourceType::User),
+            "group" => Ok(ResourceType::Group),
             _ => Err(format!("{r} not a valid resource type")),
         }
     }
