@@ -12,10 +12,9 @@ struct MappedError {
 impl From<MappedError> for Error {
     fn from(value: MappedError) -> Self {
         match value.inner {
-            ProviderStoreError::StoreError(error) => {
-                // XXX we want to use err_chain here probably...
-                Error::internal_error(format!("{} {error}", value.context))
-            }
+            ProviderStoreError::StoreError(error) => Error::internal_error(
+                format!("{} {}", value.context, DisplayErrorChain::new(error)),
+            ),
             ProviderStoreError::Scim(error) => error,
         }
     }
