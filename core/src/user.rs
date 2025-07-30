@@ -14,6 +14,9 @@ pub struct CreateUserRequest {
 
     /// An identifier for the resource as defined by the provisioning client
     pub external_id: Option<String>,
+
+    #[serde(skip_serializing_if = "skip_serializing_list::<UserGroup>")]
+    pub groups: Option<Vec<UserGroup>>,
 }
 
 #[derive(Serialize, Deserialize, JsonSchema, Clone, Debug, PartialEq)]
@@ -46,38 +49,6 @@ impl Resource for User {
 
     fn resource_type() -> String {
         String::from("User")
-    }
-}
-
-/// A StoredUser is one that combines the fields in User and StoredMeta.
-#[derive(Debug, Clone, Serialize, JsonSchema)]
-pub struct StoredUser {
-    pub id: String,
-    pub name: String,
-    pub active: bool,
-    pub external_id: Option<String>,
-    pub created: DateTime<Utc>,
-    pub last_modified: DateTime<Utc>,
-    pub version: String,
-}
-
-impl StoredParts<User> {
-    pub fn from(u: StoredUser, groups: Vec<UserGroup>) -> StoredParts<User> {
-        let user = User {
-            id: u.id,
-            name: u.name,
-            active: Some(u.active),
-            external_id: u.external_id,
-            groups: Some(groups),
-        };
-
-        let meta = StoredMeta {
-            created: u.created,
-            last_modified: u.last_modified,
-            version: u.version,
-        };
-
-        StoredParts { resource: user, meta }
     }
 }
 

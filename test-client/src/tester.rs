@@ -552,7 +552,7 @@ impl Tester {
             );
         }
 
-        // Leave out active and external id, and validate they don't change
+        // Leave out active and external id, and validate they do change
 
         let body = json!({
             "userName": "jhalpert",
@@ -575,18 +575,13 @@ impl Tester {
         {
             let check_user: User = self.result_as_resource(result)?.resource;
 
-            if check_user.active != jim.active {
-                bail!(
-                    "active changed from {:?} to {:?}",
-                    jim.active,
-                    check_user.active
-                );
+            if check_user.active.is_some() {
+                bail!("active should be None, it's {:?}", check_user.active);
             }
 
-            if check_user.external_id != jim.external_id {
+            if check_user.external_id.is_some() {
                 bail!(
-                    "external_id changed from {:?} to {:?}",
-                    jim.external_id,
+                    "external_id should be None, it's {:?}",
                     check_user.external_id
                 );
             }
@@ -635,9 +630,10 @@ impl Tester {
             );
         }
 
-        // It's possible to create a duplicate group: RFC 7644 says that SCIM2
-        // groups do not have any fields (mainly external id, display name)
-        // where uniqueness is required in the POST request.
+        // It's not possible to create a duplicate group: RFC 7644 says that
+        // SCIM2 groups do not have any fields (mainly external id, display
+        // name) where uniqueness is required in the POST request, but the
+        // in-memory provider store does not allow for duplicate groups.
 
         let conflict_result = self
             .client
@@ -645,38 +641,11 @@ impl Tester {
             .json(&body)
             .send()?;
 
-        if conflict_result.status() != StatusCode::CREATED {
+        if conflict_result.status() != StatusCode::CONFLICT {
             bail!(
                 "conflicting POST returned {} instead of {}",
                 conflict_result.status(),
-                StatusCode::CREATED
-            );
-        }
-
-        // Compare group IDs, they should be different
-        let conflicting_group: Group =
-            self.result_as_resource(conflict_result)?.resource;
-
-        if group.id() == conflicting_group.id() {
-            bail!(
-                "test group has same id ({}) as conflicting group ({})",
-                group.id(),
-                conflicting_group.id()
-            );
-        }
-
-        // Delete the duplicate group
-
-        let delete_result = self
-            .client
-            .delete(format!("{}/Groups/{}", self.url, conflicting_group.id()))
-            .send()?;
-
-        if delete_result.status() != StatusCode::NO_CONTENT {
-            bail!(
-                "DELETE returned {} instead of {}",
-                delete_result.status(),
-                StatusCode::NO_CONTENT
+                StatusCode::CONFLICT
             );
         }
 
@@ -698,8 +667,7 @@ impl Tester {
         };
 
         // Replace the existing group with the same name but without the
-        // external ID - this should keep the external ID that was there
-        // previously.
+        // external ID - this nuke the external ID that was there previously.
 
         let body = json!({
             "displayName": "Sales Reps",
@@ -727,26 +695,14 @@ impl Tester {
 
         let new_group: Group = self.result_as_resource(result)?.resource;
 
-        if new_group != *group {
-            bail!("group PUT didn't work, different group returned")
-        }
+        // External ID should None
 
-        // External ID should be the same.
-
-        let Some(new_group_external_id) = &new_group.external_id else {
+        if new_group.external_id.is_some() {
             bail!(
                 "group's external ID should be Some, its {:?}",
                 new_group.external_id
             );
         };
-
-        if Some(new_group_external_id) != group.external_id.as_ref() {
-            bail!(
-                "group's external ID changed from {:?} to {:?}",
-                group.external_id,
-                new_group.external_id,
-            );
-        }
 
         // The new group should be returned by the GET now.
 
@@ -1516,7 +1472,7 @@ impl Tester {
 
             if check_dwight_groups.len() != 1 {
                 bail!(
-                    "dwight's group's len should be 1, not {}",
+                    "jwm dwight's group's len should be 1, not {}",
                     check_dwight_groups.len()
                 );
             }

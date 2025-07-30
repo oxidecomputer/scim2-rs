@@ -4,13 +4,84 @@
 
 use super::*;
 
+use std::collections::BTreeMap;
+use std::str::FromStr;
 use std::sync::Mutex;
 use uuid::Uuid;
 
 #[derive(Clone, Serialize, JsonSchema)]
 pub struct InMemoryProviderStoreState {
-    users: Vec<StoredUser>,
-    groups: Vec<StoredGroup>,
+    users: BTreeMap<String, StoredParts<User>>,
+    groups: BTreeMap<String, StoredParts<Group>>,
+}
+
+impl InMemoryProviderStoreState {
+    fn get_group_member(
+        &self,
+        member: &GroupMember,
+    ) -> Result<GroupMember, Error> {
+        let GroupMember { resource_type, value } = member;
+
+        let Some(value) = value else {
+            // The minimum that this code needs is the value field so complain
+            // about that.
+            return Err(Error::invalid_syntax(String::from(
+                "group member missing value field",
+            )));
+        };
+
+        // Find the ID that this request is talking about, or 404
+        let resource_type = if let Some(resource_type) = resource_type {
+            let resource_type = ResourceType::from_str(resource_type)
+                .map_err(Error::invalid_syntax)?;
+
+            match resource_type {
+                ResourceType::User => {
+                    self.users
+                        .get(value)
+                        .ok_or(Error::not_found(value.clone()))?;
+                }
+
+                ResourceType::Group => {
+                    // don't support nested groups for now.
+                    return Err(Error::internal_error(
+                        "nested groups not supported".to_string(),
+                    ));
+                }
+            }
+
+            resource_type
+        } else {
+            let maybe_user = self.users.get(value);
+            let maybe_group = self.groups.get(value);
+
+            match (maybe_user, maybe_group) {
+                (None, None) => {
+                    // 404
+                    return Err(Error::not_found(value.clone()));
+                }
+
+                (Some(_), None) => ResourceType::User,
+
+                (None, Some(_)) => {
+                    return Err(Error::internal_error(
+                        "nested groups not supported".to_string(),
+                    ));
+                }
+
+                (Some(_), Some(_)) => {
+                    return Err(Error::internal_error(format!(
+                        "{value} returned a user and group!"
+                    )));
+                }
+            }
+        };
+
+        Ok(GroupMember {
+            resource_type: Some(resource_type.to_string()),
+            value: Some(value.clone()),
+        })
+    }
 }
 
 /// A non-optimized provider store implementation for use with tests
@@ -28,8 +99,8 @@ impl InMemoryProviderStore {
     pub fn new() -> Self {
         Self {
             state: Mutex::new(InMemoryProviderStoreState {
-                users: vec![],
-                groups: vec![],
+                users: BTreeMap::new(),
+                groups: BTreeMap::new(),
             }),
         }
     }
@@ -44,108 +115,104 @@ impl ProviderStore for InMemoryProviderStore {
     async fn get_user_by_id(
         &self,
         user_id: String,
-    ) -> Result<Option<StoredUser>, ProviderStoreError> {
+    ) -> Result<Option<StoredParts<User>>, ProviderStoreError> {
         let state = self.state.lock().unwrap();
-        Ok(state.users.iter().find(|user| user.id == user_id).cloned())
-    }
-
-    async fn get_user_by_username(
-        &self,
-        user_name: String,
-    ) -> Result<Option<StoredUser>, ProviderStoreError> {
-        let state = self.state.lock().unwrap();
-        Ok(state.users.iter().find(|user| user.name == user_name).cloned())
+        Ok(state.users.get(&user_id).cloned())
     }
 
     async fn create_user(
         &self,
         user_request: CreateUserRequest,
-    ) -> Result<StoredUser, ProviderStoreError> {
-        if self.get_user_by_username(user_request.name.clone()).await?.is_some()
+    ) -> Result<StoredParts<User>, ProviderStoreError> {
+        let mut state = self.state.lock().unwrap();
+
+        if state
+            .users
+            .values()
+            .any(|stored_part| stored_part.resource.name == user_request.name)
         {
             return Err(Error::conflict(user_request.name).into());
         }
 
-        let new_user = StoredUser {
-            id: Uuid::new_v4().to_string(),
-            name: user_request.name,
-            external_id: user_request.external_id,
-            // If the client doesn't assert `active`, then default to true: if
-            // an IdP doesn't use the `active` then we wouldn't want to have all
-            // users they provision be disabled.
-            active: user_request.active.unwrap_or(true),
-            created: Utc::now(),
-            last_modified: Utc::now(),
-            version: String::from("W/unimplemented"),
+        let id = Uuid::new_v4().to_string();
+
+        let new_user = StoredParts {
+            resource: User {
+                id: id.clone(),
+                name: user_request.name,
+                external_id: user_request.external_id,
+                active: user_request.active,
+                groups: None,
+            },
+
+            meta: StoredMeta {
+                created: Utc::now(),
+                last_modified: Utc::now(),
+                version: String::from("W/unimplemented"),
+            },
         };
 
-        let mut state = self.state.lock().unwrap();
-        state.users.push(new_user.clone());
+        let existing = state.users.insert(id, new_user.clone());
+        assert!(existing.is_none());
 
         Ok(new_user)
     }
 
     async fn list_users(
         &self,
-        query_params: QueryParams,
-    ) -> Result<Vec<StoredUser>, ProviderStoreError> {
+        filter: Option<FilterOp>,
+    ) -> Result<Vec<StoredParts<User>>, ProviderStoreError> {
         let state = self.state.lock().unwrap();
         let mut users = state.users.clone();
 
-        if let Some(filter) = query_params.filter() {
-            match filter {
-                FilterOp::UserNameEq(username) => {
-                    users.retain(|u| u.name.eq_ignore_ascii_case(&username))
-                }
-                _ => {
-                    return Err(Error::invalid_filter(
-                        "invalid or unsupported filter".to_string(),
-                    )
-                    .into());
-                }
+        match filter {
+            Some(FilterOp::UserNameEq(username)) => {
+                users.retain(|_, stored_part| {
+                    stored_part.resource.name.eq_ignore_ascii_case(&username)
+                })
             }
-        };
 
-        Ok(users)
+            None => {
+                // ok
+            }
+
+            Some(_) => {
+                return Err(Error::invalid_filter(
+                    "invalid or unsupported filter".to_string(),
+                )
+                .into());
+            }
+        }
+
+        Ok(users.values().cloned().collect())
     }
 
     async fn replace_user(
         &self,
         user_id: String,
         user_request: CreateUserRequest,
-    ) -> Result<StoredUser, ProviderStoreError> {
+    ) -> Result<StoredParts<User>, ProviderStoreError> {
         let mut state = self.state.lock().unwrap();
         let users = &mut state.users;
-
-        let index = match users.iter().position(|user| user.id == user_id) {
-            None => {
-                return Err(Error::not_found(user_id).into());
-            }
-
-            Some(index) => index,
-        };
 
         // userName is meant to be unique. If the user request is changing the
         // username to one that already exists, then reject it.
 
-        match users.iter().position(|user| {
-            user.name == user_request.name && user.id != user_id
+        if users.values().any(|stored_part| {
+            stored_part.resource.name == user_request.name
+                && stored_part.resource.id != user_id
         }) {
-            Some(_) => {
-                return Err(Error::conflict(format!(
-                    "username {}",
-                    user_request.name
-                ))
-                .into());
-            }
-
-            None => {
-                // ok
-            }
+            return Err(Error::conflict(format!(
+                "username {}",
+                user_request.name
+            ))
+            .into());
         }
 
-        // Update the modification time
-        users[index].last_modified = Utc::now();
+        // Can't replace a user that does not exist, so return 404 if it's not
+        // found
+        let existing_user =
+            users.get_mut(&user_id).ok_or(Error::not_found(user_id.clone()))?;
 
         // RFC 7664 § 3.5.1:
         // Attributes whose mutability is "readWrite" that are omitted from the
@@ -155,119 +222,218 @@ impl ProviderStore for InMemoryProviderStore {
         // final resource representation.
 
         // This code takes the stance: if a provisioning client doesn't assert a
-        // field, leave it alone: the IdP is the source of truth.
+        // field, leave it alone: the IdP is the source of truth. We simply
+        // accept the request and write the fields in.
 
-        let CreateUserRequest { name, active, external_id } = user_request;
+        *existing_user = StoredParts {
+            resource: User {
+                id: user_id,
+                name: user_request.name,
+                external_id: user_request.external_id,
+                active: user_request.active,
+                groups: existing_user.resource.groups.clone(),
+            },
 
-        users[index].name = name;
+            meta: StoredMeta {
+                // Keep creation time
+                created: existing_user.meta.created,
+                // Update the modification time
+                last_modified: Utc::now(),
+                // Don't touch the version, this impl does not support that!
+                version: existing_user.meta.version.clone(),
+            },
+        };
 
-        if let Some(active) = active {
-            users[index].active = active;
-        }
-
-        if let Some(external_id) = external_id {
-            users[index].external_id = Some(external_id);
-        }
-
-        Ok(users[index].clone())
+        Ok(existing_user.clone())
     }
 
     async fn delete_user_by_id(
         &self,
         user_id: String,
-    ) -> Result<Option<StoredUser>, ProviderStoreError> {
+    ) -> Result<Option<StoredParts<User>>, ProviderStoreError> {
         let mut state = self.state.lock().unwrap();
-        let maybe_user =
-            state.users.extract_if(.., |user| user.id == user_id).next();
+        let maybe_user = state.users.remove(&user_id);
         Ok(maybe_user)
     }
 
     async fn get_group_by_id(
         &self,
         group_id: String,
-    ) -> Result<Option<StoredGroup>, ProviderStoreError> {
+    ) -> Result<Option<StoredParts<Group>>, ProviderStoreError> {
         let state = self.state.lock().unwrap();
-        Ok(state.groups.iter().find(|group| group.id == group_id).cloned())
+        Ok(state.groups.get(&group_id).cloned())
     }
 
-    async fn get_group_by_displayname(
-        &self,
-        display_name: String,
-    ) -> Result<Option<StoredGroup>, ProviderStoreError> {
-        let state = self.state.lock().unwrap();
-        Ok(state
-            .groups
-            .iter()
-            .find(|group| group.display_name == display_name)
-            .cloned())
-    }
-
-    async fn create_group_with_members(
+    async fn create_group(
         &self,
         group_request: CreateGroupRequest,
-        members: Vec<StoredGroupMember>,
-    ) -> Result<StoredGroup, ProviderStoreError> {
-        let CreateGroupRequest { display_name, external_id, members: _ } =
+    ) -> Result<StoredParts<Group>, ProviderStoreError> {
+        let mut state = self.state.lock().unwrap();
+
+        // Make sure that display name is unique
+        if state.groups.values().any(|stored_part| {
+            stored_part.resource.display_name == group_request.display_name
+        }) {
+            return Err(Error::conflict(format!(
+                "displayName {}",
+                group_request.display_name
+            ))
+            .into());
+        }
+
+        let CreateGroupRequest { display_name, external_id, mut members } =
             group_request;
 
-        let new_group = StoredGroup {
-            id: Uuid::new_v4().to_string(),
-            display_name,
-            external_id,
-            created: Utc::now(),
-            last_modified: Utc::now(),
-            version: String::from("W/unimplemented"),
-            members,
+        let id = Uuid::new_v4().to_string();
+
+        // Validate the members arg, and return filled in fields. Then fill in
+        // the appropriate User's groups field.
+        if let Some(members) = &mut members {
+            for member in members {
+                *member = state.get_group_member(member)?;
+
+                // value will be filled in, so we can unwrap here
+                let user_id: &String = member
+                    .value
+                    .as_ref()
+                    .expect("get_group_member should have filled this in");
+
+                // Add to the User's groups field
+                state
+                    .users
+                    .get_mut(user_id)
+                    .expect("get_group_member would returned 404 if the user didn't exist")
+                    .resource
+                    .groups
+                    .get_or_insert_default()
+                    .push(
+                        UserGroup {
+                            member_type: Some(UserGroupType::Direct),
+                            value: Some(id.clone()),
+                            display: Some(display_name.clone()),
+                        }
+                    );
+            }
+        }
+
+        let new_group = StoredParts {
+            resource: Group {
+                id: id.clone(),
+                display_name,
+                external_id,
+                members,
+            },
+            meta: StoredMeta {
+                created: Utc::now(),
+                last_modified: Utc::now(),
+                version: String::from("W/unimplemented"),
+            },
         };
 
-        let mut state = self.state.lock().unwrap();
-        state.groups.push(new_group.clone());
+        let existing = state.groups.insert(id, new_group.clone());
+        assert!(existing.is_none());
 
         Ok(new_group)
     }
 
     async fn list_groups(
         &self,
-        query_params: QueryParams,
-    ) -> Result<Vec<StoredGroup>, ProviderStoreError> {
+        filter: Option<FilterOp>,
+    ) -> Result<Vec<StoredParts<Group>>, ProviderStoreError> {
         let state = self.state.lock().unwrap();
         let mut groups = state.groups.clone();
 
-        if let Some(filter) = query_params.filter() {
-            match filter {
-                FilterOp::DisplayNameEq(display_name) => groups.retain(|g| {
-                    g.display_name.eq_ignore_ascii_case(&display_name)
-                }),
-                _ => {
-                    return Err(Error::invalid_filter(
-                        "invalid or unsupported filter".to_string(),
-                    )
-                    .into());
-                }
+        match filter {
+            Some(FilterOp::DisplayNameEq(display_name)) => {
+                groups.retain(|_, stored_part| {
+                    stored_part
+                        .resource
+                        .display_name
+                        .eq_ignore_ascii_case(&display_name)
+                })
             }
-        };
-        Ok(groups)
+
+            None => {
+                // ok
+            }
+
+            Some(_) => {
+                return Err(Error::invalid_filter(
+                    "invalid or unsupported filter".to_string(),
+                )
+                .into());
+            }
+        }
+
+        Ok(groups.values().cloned().collect())
     }
 
-    async fn replace_group_with_members(
+    async fn replace_group(
         &self,
         group_id: String,
         group_request: CreateGroupRequest,
-        members: Vec<StoredGroupMember>,
-    ) -> Result<StoredGroup, ProviderStoreError> {
+    ) -> Result<StoredParts<Group>, ProviderStoreError> {
         let mut state = self.state.lock().unwrap();
 
-        let index =
-            match state.groups.iter().position(|group| group.id == group_id) {
-                None => {
-                    return Err(Error::not_found(group_id).into());
-                }
+        let CreateGroupRequest { display_name, external_id, mut members } =
+            group_request;
 
-                Some(index) => index,
-            };
+        // Make sure that display name is unique
+        if state.groups.values().any(|stored_part| {
+            stored_part.resource.display_name == display_name
+                && stored_part.resource.id != group_id
+        }) {
+            return Err(
+                Error::conflict(format!("displayName {display_name}")).into()
+            );
+        }
 
-        // Update the modification time
-        state.groups[index].last_modified = Utc::now();
+        // Delete all existing group membership for this group id
+        for stored_part in state.users.values_mut() {
+            if let Some(groups) = &mut stored_part.resource.groups {
+                groups.retain(|user_group| {
+                    user_group.value.as_ref() != Some(&group_id)
+                });
+            }
+        }
+
+        // Validate the members arg, and return filled in fields. Then fill in
+        // the appropriate User's groups field.
+
+        if let Some(members) = &mut members {
+            for member in members {
+                *member = state.get_group_member(member)?;
+
+                // value will be filled in, so we can unwrap here
+                let user_id: &String = member
+                    .value
+                    .as_ref()
+                    .expect("get_group_member should have filled this in");
+
+                // Add to the User's groups field
+                state
+                    .users
+                    .get_mut(user_id)
+                    .expect("get_group_member would returned 404 if the user didn't exist")
+                    .resource
+                    .groups
+                    .get_or_insert_default()
+                    .push(
+                        UserGroup {
+                            member_type: Some(UserGroupType::Direct),
+                            value: Some(group_id.clone()),
+                            display: Some(display_name.clone()),
+                        }
+                    );
+            }
+        }
+
+        // Can't replace a group that does not exist, so return 404 if it's not
+        // found
+        let existing_group = state
+            .groups
+            .get_mut(&group_id)
+            .ok_or(Error::not_found(group_id.clone()))?;
 
         // RFC 7664 § 3.5.1:
         // Attributes whose mutability is "readWrite" that are omitted from the
@@ -276,34 +442,56 @@ impl ProviderStore for InMemoryProviderStore {
         // cleared, or the service provider MAY assign a default value to the
         // final resource representation.
 
-        let CreateGroupRequest { display_name, external_id, members: _ } =
-            group_request;
-
-        state.groups[index].display_name = display_name;
-
         // This code takes the stance: if a provisioning client doesn't assert a
-        // field, leave it alone: the IdP is the source of truth.
+        // field, leave it alone: the IdP is the source of truth. We simply
+        // accept the request and write the fields in.
 
-        if let Some(external_id) = external_id {
-            state.groups[index].external_id = Some(external_id);
-        }
+        *existing_group = StoredParts {
+            resource: Group {
+                id: group_id,
+                display_name,
+                external_id,
+                members,
+            },
 
-        state.groups[index].members = members;
+            meta: StoredMeta {
+                // Keep creation time
+                created: existing_group.meta.created,
+                // Update the modification time
+                last_modified: Utc::now(),
+                // Don't touch the version, this impl does not support that!
+                version: existing_group.meta.version.clone(),
+            },
+        };
 
-        Ok(state.groups[index].clone())
+        Ok(existing_group.clone())
     }
 
     async fn delete_group_by_id(
         &self,
         group_id: String,
-    ) -> Result<Option<StoredGroup>, ProviderStoreError> {
+    ) -> Result<Option<StoredParts<Group>>, ProviderStoreError> {
         let mut state = self.state.lock().unwrap();
-        let maybe_group =
-            state.groups.extract_if(.., |group| group.id == group_id).next();
+
+        let maybe_group = if let Some(group) = state.groups.remove(&group_id) {
+            // Delete all existing group membership for this group id
+            for stored_part in state.users.values_mut() {
+                if let Some(groups) = &mut stored_part.resource.groups {
+                    groups.retain(|user_group| {
+                        user_group.value.as_ref() != Some(&group_id)
+                    });
+                }
+            }
+
+            Some(group)
+        } else {
+            None
+        };
 
         Ok(maybe_group)
     }
 
+    /*
     // Get all the groups that the user with id [`user_id`] is a member of. Note
     // that this does not support nested groups.
     async fn get_user_group_membership(
@@ -334,7 +522,7 @@ impl ProviderStore for InMemoryProviderStore {
     async fn get_group_members(
         &self,
         group_id: String,
-    ) -> Result<Vec<StoredGroupMember>, ProviderStoreError> {
+    ) -> Result<Vec<GroupMember>, ProviderStoreError> {
         let state = self.state.lock().unwrap();
 
         let index =
@@ -348,4 +536,5 @@ impl ProviderStore for InMemoryProviderStore {
 
         Ok(state.groups[index].members.clone())
     }
+    */
 }

@@ -18,7 +18,7 @@ pub struct Meta {
     pub location: String,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, JsonSchema)]
 pub struct StoredMeta {
     pub created: DateTime<Utc>,
 
@@ -27,8 +27,8 @@ pub struct StoredMeta {
     pub version: String,
 }
 
-#[derive(Debug, Clone)]
-pub struct StoredParts<R> {
+#[derive(Debug, Clone, Serialize, JsonSchema)]
+pub struct StoredParts<R: Resource> {
     pub resource: R,
     pub meta: StoredMeta,
 }

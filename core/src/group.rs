@@ -4,7 +4,7 @@
 
 use super::*;
 
-#[derive(Deserialize, JsonSchema)]
+#[derive(Deserialize, JsonSchema, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct CreateGroupRequest {
     pub display_name: String,
@@ -45,37 +45,6 @@ impl Resource for Group {
     }
 }
 
-/// A StoredGroup is one that combines the fields in Group and StoredMeta.
-#[derive(Debug, Clone, Serialize, JsonSchema, PartialEq)]
-pub struct StoredGroup {
-    pub id: String,
-    pub display_name: String,
-    pub external_id: Option<String>,
-    pub created: DateTime<Utc>,
-    pub last_modified: DateTime<Utc>,
-    pub version: String,
-    pub members: Vec<StoredGroupMember>,
-}
-
-impl StoredParts<Group> {
-    pub fn from(g: StoredGroup) -> StoredParts<Group> {
-        let group = Group {
-            id: g.id,
-            display_name: g.display_name,
-            external_id: g.external_id,
-            members: Some(g.members.into_iter().map(|m| m.into()).collect()),
-        };
-
-        let meta = StoredMeta {
-            created: g.created,
-            last_modified: g.last_modified,
-            version: g.version,
-        };
-
-        StoredParts { resource: group, meta }
-    }
-}
-
 #[derive(Serialize, Deserialize, JsonSchema, Clone, Debug, PartialEq)]
 pub struct GroupMember {
     /// User or Group
@@ -84,22 +53,4 @@ pub struct GroupMember {
 
     /// identifier of the member of this group
     pub value: Option<String>,
-}
-
-#[derive(Clone, Debug, PartialEq, Serialize, JsonSchema)]
-pub struct StoredGroupMember {
-    /// User or Group
-    pub resource_type: ResourceType,
-
-    /// identifier of the member of this group
-    pub value: String,
-}
-
-impl From<StoredGroupMember> for GroupMember {
-    fn from(m: StoredGroupMember) -> GroupMember {
-        GroupMember {
-            resource_type: Some(m.resource_type.to_string()),
-            value: Some(m.value),
-        }
-    }
 }

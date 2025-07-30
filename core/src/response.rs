@@ -27,13 +27,12 @@ pub struct ListResponse {
 }
 
 impl ListResponse {
-    pub fn from_resources<R, S>(
-        resources: Vec<S>,
+    pub fn from_resources<R>(
+        resources: Vec<StoredParts<R>>,
         query_params: QueryParams,
     ) -> Result<Self, Error>
     where
         R: Resource,
-        S: Into<StoredParts<R>>,
     {
         let schemas = vec![String::from(
             "urn:ietf:params:scim:api:messages:2.0:ListResponse",
@@ -45,7 +44,7 @@ impl ListResponse {
         let resources = resources
             .into_iter()
             .map(|s| {
-                let StoredParts { resource, meta } = s.into();
+                let StoredParts { resource, meta } = s;
                 SingleResourceResponse::from_resource(
                     resource,
                     meta,
@@ -183,6 +182,9 @@ pub enum ErrorType {
 
     #[serde(rename = "invalidSyntax")]
     InvalidSyntax,
+
+    #[serde(rename = "mutability")]
+    Mutability,
 }
 
 /// The SCIM error format is specified in RFC 7644, section 3.12
@@ -253,6 +255,10 @@ impl Error {
 
     pub fn not_implemented(detail: String) -> Self {
         Self::new(StatusCode::NOT_IMPLEMENTED, None, detail)
+    }
+
+    pub fn mutability(detail: String) -> Self {
+        Self::new(StatusCode::BAD_REQUEST, Some(ErrorType::Mutability), detail)
     }
 
     pub fn status(&self) -> Result<u16, std::num::ParseIntError> {

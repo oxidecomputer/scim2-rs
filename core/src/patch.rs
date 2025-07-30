@@ -1,7 +1,11 @@
 use schemars::JsonSchema;
 use serde::Deserialize;
 
-use crate::{StoredGroup, StoredUser};
+use crate::Group;
+use crate::GroupMember;
+use crate::ResourceType;
+use crate::StoredParts;
+use crate::User;
 
 #[derive(Debug)]
 pub enum PatchRequestError {
@@ -46,8 +50,8 @@ impl PatchRequest {
     /// applying a series of `PatchOp`s to the original object.
     pub fn apply_user_ops(
         &self,
-        stored_user: &StoredUser,
-    ) -> Result<StoredUser, PatchRequestError> {
+        stored_user: &StoredParts<User>,
+    ) -> Result<StoredParts<User>, PatchRequestError> {
         self.validate_schema()?;
         let mut updated_user = stored_user.clone();
 
@@ -71,7 +75,7 @@ impl PatchRequest {
                 ));
             };
 
-            updated_user.active = change.active;
+            updated_user.resource.active = Some(change.active);
         }
 
         Ok(updated_user)
@@ -81,8 +85,8 @@ impl PatchRequest {
     /// applying a series of `PatchOp`s to the original object.
     pub fn apply_group_ops(
         &self,
-        stored_group: &StoredGroup,
-    ) -> Result<StoredGroup, PatchRequestError> {
+        stored_group: &StoredParts<Group>,
+    ) -> Result<StoredParts<Group>, PatchRequestError> {
         self.validate_schema()?;
         let mut updated_group = stored_group.clone();
 
@@ -108,7 +112,7 @@ impl PatchRequest {
 
 fn apply_group_replace_op(
     value: &serde_json::Value,
-    group: &mut StoredGroup,
+    group: &mut StoredParts<Group>,
 ) -> Result<(), PatchRequestError> {
     #[derive(Debug, Deserialize)]
     #[serde(rename_all = "camelCase")]
@@ -124,13 +128,14 @@ fn apply_group_replace_op(
         ));
     };
 
-    if !group.id.eq_ignore_ascii_case(&change.id) {
+    if !group.resource.id.eq_ignore_ascii_case(&change.id) {
         return Err(PatchRequestError::Invalid(format!(
             "unexpected group id {}",
             change.id
         )));
     }
-    group.display_name = change.display_name;
+
+    group.resource.display_name = change.display_name;
 
     Ok(())
 }
@@ -138,7 +143,7 @@ fn apply_group_replace_op(
 fn apply_group_add_op(
     path: Option<&str>,
     value: &serde_json::Value,
-    group: &mut StoredGroup,
+    group: &mut StoredParts<Group>,
 ) -> Result<(), PatchRequestError> {
     let Some(_path) = path.filter(|p| p.eq_ignore_ascii_case("members")) else {
         return Err(PatchRequestError::Invalid(
@@ -165,16 +170,16 @@ fn apply_group_add_op(
             ));
         };
 
-        if group.display_name.eq_ignore_ascii_case(&member.display) {
+        if group.resource.display_name.eq_ignore_ascii_case(&member.display) {
             return Err(PatchRequestError::Invalid(format!(
                 "group add op value display was {} expected {}",
-                member.display, group.display_name
+                member.display, group.resource.display_name
             )));
         }
 
-        group.members.push(crate::StoredGroupMember {
-            resource_type: crate::ResourceType::User,
-            value: member.value,
+        group.resource.members.get_or_insert_default().push(GroupMember {
+            resource_type: Some(ResourceType::User.to_string()),
+            value: Some(member.value),
         });
     }
 
@@ -215,17 +220,21 @@ fn parse_remove_path(path: &str) -> Result<GroupRemoveOp, PatchRequestError> {
 
 fn apply_group_remove_op(
     path: &str,
-    group: &mut StoredGroup,
+    group: &mut StoredParts<Group>,
 ) -> Result<(), PatchRequestError> {
     match parse_remove_path(path)? {
-        GroupRemoveOp::All => group.members = Vec::new(),
+        GroupRemoveOp::All => group.resource.members = Some(Vec::new()),
         GroupRemoveOp::Indvidual(value) => {
-            if let Some(idx) = group
-                .members
-                .iter()
-                .position(|m| m.value.eq_ignore_ascii_case(&value))
-            {
-                group.members.swap_remove(idx);
+            let groups = group.resource.members.get_or_insert_default();
+
+            if let Some(idx) = groups.iter().position(|m| {
+                if let Some(mvalue) = &m.value {
+                    mvalue.eq_ignore_ascii_case(&value)
+                } else {
+                    false
+                }
+            }) {
+                groups.swap_remove(idx);
             }
         }
     };

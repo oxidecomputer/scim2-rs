@@ -10,73 +10,62 @@ pub trait ProviderStore: Sync {
     async fn get_user_by_id(
         &self,
         user_id: String,
-    ) -> Result<Option<StoredUser>, ProviderStoreError>;
-
-    async fn get_user_by_username(
-        &self,
-        user_name: String,
-    ) -> Result<Option<StoredUser>, ProviderStoreError>;
+    ) -> Result<Option<StoredParts<User>>, ProviderStoreError>;
 
     async fn create_user(
         &self,
         user_request: CreateUserRequest,
-    ) -> Result<StoredUser, ProviderStoreError>;
+    ) -> Result<StoredParts<User>, ProviderStoreError>;
 
     async fn list_users(
         &self,
-        query_params: QueryParams,
-    ) -> Result<Vec<StoredUser>, ProviderStoreError>;
+        filter: Option<FilterOp>,
+    ) -> Result<Vec<StoredParts<User>>, ProviderStoreError>;
 
     async fn replace_user(
         &self,
         user_id: String,
         user_request: CreateUserRequest,
-    ) -> Result<StoredUser, ProviderStoreError>;
+    ) -> Result<StoredParts<User>, ProviderStoreError>;
 
-    // A Some(StoredUser) is returned if the User existed prior to the delete,
+    // A Some(User) is returned if the User existed prior to the delete,
     // otherwise None is returned.
     async fn delete_user_by_id(
         &self,
         user_id: String,
-    ) -> Result<Option<StoredUser>, ProviderStoreError>;
+    ) -> Result<Option<StoredParts<User>>, ProviderStoreError>;
 
     async fn get_group_by_id(
         &self,
         group_id: String,
-    ) -> Result<Option<StoredGroup>, ProviderStoreError>;
+    ) -> Result<Option<StoredParts<Group>>, ProviderStoreError>;
 
-    async fn get_group_by_displayname(
-        &self,
-        display_name: String,
-    ) -> Result<Option<StoredGroup>, ProviderStoreError>;
-
-    async fn create_group_with_members(
+    async fn create_group(
         &self,
         group_request: CreateGroupRequest,
-        members: Vec<StoredGroupMember>,
-    ) -> Result<StoredGroup, ProviderStoreError>;
+    ) -> Result<StoredParts<Group>, ProviderStoreError>;
 
     async fn list_groups(
         &self,
-        query_params: QueryParams,
-    ) -> Result<Vec<StoredGroup>, ProviderStoreError>;
+        filter: Option<FilterOp>,
+    ) -> Result<Vec<StoredParts<Group>>, ProviderStoreError>;
 
-    async fn replace_group_with_members(
+    async fn replace_group(
         &self,
         group_id: String,
         group_request: CreateGroupRequest,
-        members: Vec<StoredGroupMember>,
-    ) -> Result<StoredGroup, ProviderStoreError>;
+    ) -> Result<StoredParts<Group>, ProviderStoreError>;
 
     // Delete a group, and all group memberships.
     //
-    // A Some(StoredGroup) is returned if the Group existed prior to the delete,
+    // A Some(Group) is returned if the Group existed prior to the delete,
     // otherwise None is returned.
     async fn delete_group_by_id(
         &self,
         group_id: String,
-    ) -> Result<Option<StoredGroup>, ProviderStoreError>;
+    ) -> Result<Option<StoredParts<Group>>, ProviderStoreError>;
 
+    /*
     async fn get_user_group_membership(
         &self,
         user_id: String,
@@ -85,7 +74,8 @@ pub trait ProviderStore: Sync {
     async fn get_group_members(
         &self,
         group_id: String,
-    ) -> Result<Vec<StoredGroupMember>, ProviderStoreError>;
+    ) -> Result<Vec<GroupMember>, ProviderStoreError>;
+    */
 }
 
 /// The backing store for users and groups may throw its own error type, or it
