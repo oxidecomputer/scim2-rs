@@ -89,6 +89,15 @@ mod test {
             parse_filter_param("USERNAME eq \"JAMES\""),
             FilterOp::UserNameEq("james".to_string())
         );
+
+        assert_eq!(
+            parse_filter_param(
+                "USERNAME eq \"michael+dakota@oxidecomputer.com\""
+            ),
+            FilterOp::UserNameEq(
+                "michael+dakota@oxidecomputer.com".to_string()
+            )
+        );
     }
 
     #[test]

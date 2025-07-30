@@ -190,7 +190,7 @@ pub async fn get_service_provider_config(
                     "urn:ietf:params:scim:schemas:core:2.0:ServiceProviderConfig"
                   ],
                   "patch": {
-                    "supported": false
+                    "supported": true
                   },
                   "bulk": {
                     "supported": false

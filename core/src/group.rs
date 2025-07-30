@@ -46,7 +46,7 @@ impl Resource for Group {
 }
 
 /// A StoredGroup is one that combines the fields in Group and StoredMeta.
-#[derive(Clone, Serialize, JsonSchema, PartialEq)]
+#[derive(Debug, Clone, Serialize, JsonSchema, PartialEq)]
 pub struct StoredGroup {
     pub id: String,
     pub display_name: String,
