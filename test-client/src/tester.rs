@@ -10,10 +10,12 @@ use reqwest::blocking::Client;
 use serde::Serialize;
 use serde::de::DeserializeOwned;
 use serde_json::json;
+use std::str::FromStr;
 
 use scim2_rs::Group;
 use scim2_rs::ListResponse;
 use scim2_rs::Resource;
+use scim2_rs::ResourceType;
 use scim2_rs::SingleResourceResponse;
 use scim2_rs::StoredMeta;
 use scim2_rs::StoredParts;
@@ -46,6 +48,8 @@ impl Tester {
             self.create_empty_group().context("create_empty_group")?;
 
         self.replace_group_test(&sales_reps).context("replace_group_test")?;
+
+        self.test_groups(&dwight, &jim).context("test_groups")?;
 
         Ok(())
     }
@@ -103,37 +107,99 @@ impl Tester {
     fn nonexistent_resource_tests(&self) -> anyhow::Result<()> {
         let random_id = "999999";
 
-        // A GET of nonexistent user = 404
+        // A GET of non-existent user = 404
         let result = self
             .client
             .get(format!("{}/Users/{}", self.url, random_id))
             .send()?;
 
-        assert_eq!(result.status(), StatusCode::NOT_FOUND);
+        if result.status() != StatusCode::NOT_FOUND {
+            bail!(
+                "GET of non-existent user returned {} not {}",
+                result.status(),
+                StatusCode::NOT_FOUND,
+            );
+        }
 
-        // DELETE of nonexistent user = 404
+        // PUT of non-existent user = 404
+        let body = json!({
+            "userName": "notblank",
+        });
+
+        let result = self
+            .client
+            .put(format!("{}/Users/{}", self.url, random_id))
+            .json(&body)
+            .send()?;
+
+        if result.status() != StatusCode::NOT_FOUND {
+            bail!(
+                "PUT of non-existent user returned {} not {}",
+                result.status(),
+                StatusCode::NOT_FOUND,
+            );
+        }
+
+        // DELETE of non-existent user = 404
         let result = self
             .client
             .delete(format!("{}/Users/{}", self.url, random_id))
             .send()?;
 
-        assert_eq!(result.status(), StatusCode::NOT_FOUND);
+        if result.status() != StatusCode::NOT_FOUND {
+            bail!(
+                "DELETE of non-existent user returned {} not {}",
+                result.status(),
+                StatusCode::NOT_FOUND,
+            );
+        }
 
-        // A GET of nonexistent group = 404
+        // A GET of non-existent group = 404
         let result = self
             .client
             .get(format!("{}/Groups/{}", self.url, random_id))
             .send()?;
 
-        assert_eq!(result.status(), StatusCode::NOT_FOUND);
+        if result.status() != StatusCode::NOT_FOUND {
+            bail!(
+                "GET of non-existent group returned {} not {}",
+                result.status(),
+                StatusCode::NOT_FOUND,
+            );
+        }
 
-        // DELETE of nonexistent group = 404
+        // PUT of non-existent group = 404
+        let body = json!({
+            "displayName": "notblank",
+        });
+
+        let result = self
+            .client
+            .put(format!("{}/Groups/{}", self.url, random_id))
+            .json(&body)
+            .send()?;
+
+        if result.status() != StatusCode::NOT_FOUND {
+            bail!(
+                "PUT of non-existent group returned {} not {}",
+                result.status(),
+                StatusCode::NOT_FOUND,
+            );
+        }
+
+        // DELETE of non-existent group = 404
         let result = self
             .client
             .delete(format!("{}/Groups/{}", self.url, random_id))
             .send()?;
 
-        assert_eq!(result.status(), StatusCode::NOT_FOUND);
+        if result.status() != StatusCode::NOT_FOUND {
+            bail!(
+                "DELETE of non-existent group returned {} not {}",
+                result.status(),
+                StatusCode::NOT_FOUND,
+            );
+        }
 
         Ok(())
     }
@@ -642,6 +708,488 @@ impl Tester {
 
         if old_group != *group {
             bail!("group revert PUT didn't work, new group returned")
+        }
+
+        Ok(())
+    }
+
+    fn test_groups(&self, dwight: &User, jim: &User) -> anyhow::Result<()> {
+        // The existing "Sales Reps" group should be empty
+
+        let sales_reps_group_id = {
+            let result =
+                self.client.get(format!("{}/Groups", self.url)).send()?;
+
+            if result.status() != StatusCode::OK {
+                bail!("listing groups returned {}", result.status());
+            }
+
+            let mut groups: Vec<Group> =
+                self.result_as_resource_list(result)?;
+
+            if groups.len() != 1 {
+                bail!("more than one group returned!");
+            }
+
+            if groups[0].display_name != "Sales Reps" {
+                bail!("unexpected group returned!");
+            }
+
+            if let Some(members) = &groups[0].members {
+                if !members.is_empty() {
+                    bail!("existing Sales Reps group not empty!");
+                }
+            }
+
+            groups.pop().unwrap().id
+        };
+
+        // And the existing user's groups should be empty
+
+        {
+            let result =
+                self.client.get(format!("{}/Users", self.url)).send()?;
+
+            if result.status() != StatusCode::OK {
+                bail!("listing users returned {}", result.status());
+            }
+
+            let users: Vec<User> = self.result_as_resource_list(result)?;
+
+            for user in &users {
+                if let Some(groups) = &user.groups {
+                    if !groups.is_empty() {
+                        bail!("existing user {} groups not empty!", user.id);
+                    }
+                }
+            }
+        }
+
+        // Adding a non-existent user to a group should be a 404
+
+        let body = json!(
+            {
+              "schemas": [Group::schema()],
+              "displayName": "Sales Reps",
+              "members": [
+                {
+                  "value": "999999",
+                }
+              ]
+            }
+        );
+
+        let result = self
+            .client
+            .put(format!("{}/Groups/{}", self.url, sales_reps_group_id))
+            .json(&body)
+            .send()?;
+
+        if result.status() != StatusCode::NOT_FOUND {
+            bail!(
+                "PUT with non-existent user should be 404, not {}",
+                result.status()
+            );
+        }
+
+        // Add the first user to the group with PUT
+
+        let body = json!(
+            {
+              "schemas": [Group::schema()],
+              "displayName": "Sales Reps",
+              "members": [
+                {
+                  "value": jim.id,
+                }
+              ]
+            }
+        );
+
+        let result = self
+            .client
+            .put(format!("{}/Groups/{}", self.url, sales_reps_group_id))
+            .json(&body)
+            .send()?;
+
+        if result.status() != StatusCode::OK {
+            bail!(
+                "PUT with first user should be {}, not {}",
+                StatusCode::OK,
+                result.status(),
+            );
+        }
+
+        // Now, that user should have this group in its `groups` field.
+
+        {
+            let result = self
+                .client
+                .get(format!("{}/Users/{}", self.url, jim.id))
+                .send()?;
+
+            if result.status() != StatusCode::OK {
+                bail!(
+                    "GET for first user should be {}, not {}",
+                    StatusCode::OK,
+                    result.status(),
+                );
+            }
+
+            let first_user: User = self.result_as_resource(result)?.resource;
+
+            let Some(first_user_groups) = &first_user.groups else {
+                bail!("first user's groups should be Some");
+            };
+
+            if first_user_groups.len() != 1 {
+                bail!(
+                    "first user's group's len should be 1, not {}",
+                    first_user_groups.len()
+                );
+            }
+
+            if !first_user_groups.iter().any(|first_user_group| {
+                first_user_group.value.as_ref() == Some(&sales_reps_group_id)
+            }) {
+                bail!(
+                    "first user's group's value should contain {}",
+                    sales_reps_group_id,
+                );
+            }
+        }
+
+        // And the group should have the user in its `members` field.
+
+        {
+            let result = self
+                .client
+                .get(format!("{}/Groups/{}", self.url, sales_reps_group_id))
+                .send()?;
+
+            if result.status() != StatusCode::OK {
+                bail!(
+                    "GET for group should be {}, not {}",
+                    StatusCode::OK,
+                    result.status(),
+                );
+            }
+
+            let check: Group = self.result_as_resource(result)?.resource;
+
+            let Some(check_members) = &check.members else {
+                bail!("expected group to have Some members");
+            };
+
+            if check_members.len() != 1 {
+                bail!(
+                    "expected group's members to have len 1 not {}",
+                    check_members.len()
+                );
+            }
+
+            if !check_members
+                .iter()
+                .any(|member| member.value.as_ref() == Some(&jim.id))
+            {
+                bail!(
+                    "user {} not present in group member list after first PUT",
+                    jim.id
+                );
+            }
+
+            if let Some(check_member_resource_type_string) =
+                &check_members[0].resource_type
+            {
+                let check_member_resource_type = match ResourceType::from_str(
+                    check_member_resource_type_string,
+                ) {
+                    Ok(value) => value,
+                    Err(e) => bail!("ResourceType::from_str failed: {e}"),
+                };
+
+                if check_member_resource_type != ResourceType::User {
+                    bail!("expected group's member to have resource type User");
+                }
+            }
+        }
+
+        // now, add the second user to the group
+
+        let body = json!(
+            {
+              "schemas": [Group::schema()],
+              "displayName": "Sales Reps",
+              "members": [
+                {
+                  "value": jim.id,
+                },
+                {
+                  "value": dwight.id,
+                  "type": "User",
+                }
+              ]
+            }
+        );
+
+        let result = self
+            .client
+            .put(format!("{}/Groups/{}", self.url, sales_reps_group_id))
+            .json(&body)
+            .send()?;
+
+        if result.status() != StatusCode::OK {
+            bail!(
+                "PUT with both users should be {}, not {}",
+                StatusCode::OK,
+                result.status(),
+            );
+        }
+
+        // check that the group now has both users in its members field
+
+        {
+            let result = self
+                .client
+                .get(format!("{}/Groups/{}", self.url, sales_reps_group_id))
+                .send()?;
+
+            if result.status() != StatusCode::OK {
+                bail!(
+                    "GET for group should be {}, not {}",
+                    StatusCode::OK,
+                    result.status(),
+                );
+            }
+
+            let check: Group = self.result_as_resource(result)?.resource;
+
+            let Some(check_members) = &check.members else {
+                bail!("expected group to have Some members");
+            };
+
+            if check_members.len() != 2 {
+                bail!(
+                    "expected group's members to have len 2 not {}",
+                    check_members.len()
+                );
+            }
+
+            if !check_members
+                .iter()
+                .any(|member| member.value.as_ref() == Some(&jim.id))
+            {
+                bail!(
+                    "user {} not present in group member list after second PUT",
+                    jim.id
+                );
+            }
+
+            if !check_members
+                .iter()
+                .any(|member| member.value.as_ref() == Some(&dwight.id))
+            {
+                bail!(
+                    "user {} not present in group member list after second PUT",
+                    dwight.id
+                );
+            }
+        }
+
+        // add another group, importantly one that only Dwight is in
+
+        let body = json!(
+            {
+              "schemas": [Group::schema()],
+              "displayName": "Assistant to the Assistant to the Regional Manager",
+              "members": [
+                {
+                  "value": dwight.id,
+                }
+              ]
+            }
+        );
+
+        let result = self
+            .client
+            .post(format!("{}/Groups", self.url))
+            .json(&body)
+            .send()?;
+
+        if result.status() != StatusCode::CREATED {
+            bail!(
+                "POST for aarm group should be {}, not {}",
+                StatusCode::CREATED,
+                result.status(),
+            );
+        }
+
+        let aarm_group: Group = self.result_as_resource(result)?.resource;
+
+        // This new group should only have Dwight in it
+
+        {
+            let Some(aarm_members) = &aarm_group.members else {
+                bail!("expected AARM group to have Some members");
+            };
+
+            if aarm_members.len() != 1 {
+                bail!(
+                    "expected AARM group's members to have len 1 not {}",
+                    aarm_members.len()
+                );
+            }
+
+            if !aarm_members
+                .iter()
+                .any(|member| member.value.as_ref() == Some(&dwight.id))
+            {
+                bail!(
+                    "user {} not present in group member list after second PUT",
+                    dwight.id
+                );
+            }
+        }
+
+        // Dwight should have two groups in the User resource field
+
+        {
+            let result = self
+                .client
+                .get(format!("{}/Users/{}", self.url, dwight.id))
+                .send()?;
+
+            if result.status() != StatusCode::OK {
+                bail!(
+                    "GET for user should be {}, not {}",
+                    StatusCode::OK,
+                    result.status(),
+                );
+            }
+
+            let check_dwight: User = self.result_as_resource(result)?.resource;
+
+            let Some(check_dwight_groups) = &check_dwight.groups else {
+                bail!("dwight's groups should be Some");
+            };
+
+            if check_dwight_groups.len() != 2 {
+                bail!(
+                    "dwight's group's len should be 2, not {}",
+                    check_dwight_groups.len()
+                );
+            }
+
+            if !check_dwight_groups.iter().any(|user_group| {
+                user_group.value.as_ref() == Some(&aarm_group.id)
+            }) {
+                bail!(
+                    "dwight user's group's value should contain {}",
+                    aarm_group.id,
+                );
+            }
+
+            if !check_dwight_groups.iter().any(|user_group| {
+                user_group.value.as_ref() == Some(&sales_reps_group_id)
+            }) {
+                bail!(
+                    "dwight user's group's value should contain {}",
+                    sales_reps_group_id,
+                );
+            }
+        }
+
+        // Jim should have one still
+
+        {
+            let result = self
+                .client
+                .get(format!("{}/Users/{}", self.url, jim.id))
+                .send()?;
+
+            if result.status() != StatusCode::OK {
+                bail!(
+                    "GET for user should be {}, not {}",
+                    StatusCode::OK,
+                    result.status(),
+                );
+            }
+
+            let check_jim: User = self.result_as_resource(result)?.resource;
+
+            let Some(check_jim_groups) = &check_jim.groups else {
+                bail!("jim's groups should be Some");
+            };
+
+            if check_jim_groups.len() != 1 {
+                bail!(
+                    "jim's group's len should be 1, not {}",
+                    check_jim_groups.len()
+                );
+            }
+
+            if !check_jim_groups.iter().any(|user_group| {
+                user_group.value.as_ref() == Some(&sales_reps_group_id)
+            }) {
+                bail!(
+                    "jim user's group's value should contain {}",
+                    sales_reps_group_id,
+                );
+            }
+        }
+
+        // if the AARM group is deleted, dwight's membership should change
+
+        {
+            let result = self
+                .client
+                .delete(format!("{}/Groups/{}", self.url, aarm_group.id))
+                .send()?;
+
+            if result.status() != StatusCode::NO_CONTENT {
+                bail!(
+                    "DELETE for group should be {}, not {}",
+                    StatusCode::NO_CONTENT,
+                    result.status(),
+                );
+            }
+        }
+
+        {
+            let result = self
+                .client
+                .get(format!("{}/Users/{}", self.url, dwight.id))
+                .send()?;
+
+            if result.status() != StatusCode::OK {
+                bail!(
+                    "GET for user should be {}, not {}",
+                    StatusCode::OK,
+                    result.status(),
+                );
+            }
+
+            let check_dwight: User = self.result_as_resource(result)?.resource;
+
+            let Some(check_dwight_groups) = &check_dwight.groups else {
+                bail!("dwight's groups should be Some");
+            };
+
+            if check_dwight_groups.len() != 1 {
+                bail!(
+                    "dwight's group's len should be 1, not {}",
+                    check_dwight_groups.len()
+                );
+            }
+
+            if !check_dwight_groups.iter().any(|user_group| {
+                user_group.value.as_ref() == Some(&sales_reps_group_id)
+            }) {
+                bail!(
+                    "dwight user's group's value should contain {}",
+                    sales_reps_group_id,
+                );
+            }
         }
 
         Ok(())

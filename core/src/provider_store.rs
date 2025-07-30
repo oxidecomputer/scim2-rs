@@ -50,9 +50,10 @@ pub trait ProviderStore: Sync {
         display_name: String,
     ) -> Result<Option<StoredGroup>, ProviderStoreError>;
 
-    async fn create_group(
+    async fn create_group_with_members(
         &self,
         group_request: CreateGroupRequest,
+        members: Vec<StoredGroupMember>,
     ) -> Result<StoredGroup, ProviderStoreError>;
 
     async fn list_groups(
@@ -60,18 +61,31 @@ pub trait ProviderStore: Sync {
         query_params: QueryParams,
     ) -> Result<Vec<StoredGroup>, ProviderStoreError>;
 
-    async fn replace_group(
+    async fn replace_group_with_members(
         &self,
         group_id: String,
         group_request: CreateGroupRequest,
+        members: Vec<StoredGroupMember>,
     ) -> Result<StoredGroup, ProviderStoreError>;
 
+    // Delete a group, and all group memberships.
+    //
     // A Some(StoredGroup) is returned if the Group existed prior to the delete,
     // otherwise None is returned.
     async fn delete_group_by_id(
         &self,
         group_id: String,
     ) -> Result<Option<StoredGroup>, ProviderStoreError>;
+
+    async fn get_user_group_membership(
+        &self,
+        user_id: String,
+    ) -> Result<Vec<UserGroup>, ProviderStoreError>;
+
+    async fn get_group_members(
+        &self,
+        group_id: String,
+    ) -> Result<Vec<StoredGroupMember>, ProviderStoreError>;
 }
 
 /// The backing store for users and groups may throw its own error type, or it

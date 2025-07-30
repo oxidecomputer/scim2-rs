@@ -4,6 +4,8 @@
 
 use super::*;
 
+use std::str::FromStr;
+
 struct MappedError {
     inner: ProviderStoreError,
     context: String,
@@ -56,11 +58,28 @@ impl<T: ProviderStore> Provider<T> {
         &self,
         query_params: QueryParams,
     ) -> Result<ListResponse, Error> {
-        self.store
+        let stored_users = self
+            .store
             .list_users(query_params.clone())
             .await
-            .map_err(err_with_context("list users failed!".to_string()))
-            .map(|users| ListResponse::from_resources(users, query_params))?
+            .map_err(err_with_context("list users failed!".to_string()))?;
+
+        let mut users: Vec<StoredParts<User>> =
+            Vec::with_capacity(stored_users.len());
+
+        for stored_user in stored_users {
+            let members = self
+                .store
+                .get_user_group_membership(stored_user.id.clone())
+                .await
+                .map_err(err_with_context(
+                    "get_user_group_membership failed!".to_string(),
+                ))?;
+
+            users.push(StoredParts::<User>::from(stored_user, members));
+        }
+
+        ListResponse::from_resources(users, query_params)
     }
 
     pub async fn get_user_by_id(
@@ -77,7 +96,16 @@ impl<T: ProviderStore> Provider<T> {
             return Err(Error::not_found(user_id));
         };
 
-        let StoredParts { resource: user, meta } = stored_user.into();
+        let members = self
+            .store
+            .get_user_group_membership(stored_user.id.clone())
+            .await
+            .map_err(err_with_context(
+                "get_user_group_membership failed!".to_string(),
+            ))?;
+
+        let StoredParts { resource: user, meta } =
+            StoredParts::<User>::from(stored_user, members);
         SingleResourceResponse::from_resource(user, meta, Some(query_params))
     }
 
@@ -91,7 +119,10 @@ impl<T: ProviderStore> Provider<T> {
             .await
             .map_err(err_with_context("create user failed!".to_string()))?;
 
-        let StoredParts { resource: user, meta } = stored_user.into();
+        // `groups` is readOnly, so clients cannot add users to groups when
+        // creating new users.
+        let StoredParts { resource: user, meta } =
+            StoredParts::<User>::from(stored_user, vec![]);
         SingleResourceResponse::from_resource(user, meta, None)
     }
 
@@ -107,7 +138,16 @@ impl<T: ProviderStore> Provider<T> {
                 )),
             )?;
 
-        let StoredParts { resource: user, meta } = stored_user.into();
+        let members = self
+            .store
+            .get_user_group_membership(stored_user.id.clone())
+            .await
+            .map_err(err_with_context(
+                "get_user_group_membership failed!".to_string(),
+            ))?;
+
+        let StoredParts { resource: user, meta } =
+            StoredParts::<User>::from(stored_user, members);
         SingleResourceResponse::from_resource(user, meta, None)
     }
 
@@ -133,11 +173,20 @@ impl<T: ProviderStore> Provider<T> {
         &self,
         query_params: QueryParams,
     ) -> Result<ListResponse, Error> {
-        self.store
+        let stored_groups = self
+            .store
             .list_groups(query_params.clone())
             .await
-            .map_err(err_with_context("list groups failed!".to_string()))
-            .map(|groups| ListResponse::from_resources(groups, query_params))?
+            .map_err(err_with_context("list groups failed!".to_string()))?;
+
+        let mut groups: Vec<StoredParts<Group>> =
+            Vec::with_capacity(stored_groups.len());
+
+        for stored_group in stored_groups {
+            groups.push(StoredParts::<Group>::from(stored_group));
+        }
+
+        ListResponse::from_resources(groups, query_params)
     }
 
     pub async fn get_group_by_id(
@@ -154,7 +203,8 @@ impl<T: ProviderStore> Provider<T> {
             return Err(Error::not_found(group_id));
         };
 
-        let StoredParts { resource: group, meta } = stored_group.into();
+        let StoredParts { resource: group, meta } =
+            StoredParts::<Group>::from(stored_group);
 
         SingleResourceResponse::from_resource::<Group>(
             group,
@@ -163,16 +213,120 @@ impl<T: ProviderStore> Provider<T> {
         )
     }
 
+    async fn get_group_member(
+        &self,
+        member: &GroupMember,
+    ) -> Result<StoredGroupMember, Error> {
+        let GroupMember { resource_type, value } = member;
+
+        let Some(value) = value else {
+            // The minimum that this code needs is the value field so
+            // complain about that.
+            return Err(Error::invalid_syntax(String::from(
+                "group member missing value field",
+            )));
+        };
+
+        // Find the ID that this request is talking about, or 404
+        let resource_type = if let Some(resource_type) = resource_type {
+            let resource_type = ResourceType::from_str(resource_type)
+                .map_err(Error::invalid_syntax)?;
+
+            match resource_type {
+                ResourceType::User => {
+                    let maybe_user = self
+                        .store
+                        .get_user_by_id(value.clone())
+                        .await
+                        .map_err(err_with_context(
+                            "get_user_by_id".to_string(),
+                        ))?;
+
+                    if maybe_user.is_none() {
+                        return Err(Error::not_found(value.clone()));
+                    }
+                }
+
+                ResourceType::Group => {
+                    // don't support nested groups for now.
+                    return Err(Error::internal_error(
+                        "nested groups not supported".to_string(),
+                    ));
+                }
+            }
+
+            resource_type
+        } else {
+            let maybe_user =
+                self.store.get_user_by_id(value.clone()).await.map_err(
+                    err_with_context("get_group_members".to_string()),
+                )?;
+
+            let maybe_group =
+                self.store.get_group_by_id(value.clone()).await.map_err(
+                    err_with_context("get_group_members".to_string()),
+                )?;
+
+            match (maybe_user, maybe_group) {
+                (None, None) => {
+                    // 404
+                    return Err(Error::not_found(value.clone()));
+                }
+
+                (Some(_), None) => ResourceType::User,
+
+                (None, Some(_)) => {
+                    return Err(Error::internal_error(
+                        "nested groups not supported".to_string(),
+                    ));
+                }
+
+                (Some(_), Some(_)) => {
+                    return Err(Error::internal_error(format!(
+                        "{value} returned a user and group!"
+                    )));
+                }
+            }
+        };
+
+        let stored_member =
+            StoredGroupMember { resource_type, value: value.clone() };
+
+        Ok(stored_member)
+    }
+
+    async fn get_group_members(
+        &self,
+        members: &[GroupMember],
+    ) -> Result<Vec<StoredGroupMember>, Error> {
+        let mut stored_members: Vec<StoredGroupMember> =
+            Vec::with_capacity(members.len());
+
+        for member in members {
+            stored_members.push(self.get_group_member(member).await?);
+        }
+
+        Ok(stored_members)
+    }
+
     pub async fn create_group(
         &self,
         request: CreateGroupRequest,
     ) -> Result<SingleResourceResponse, Error> {
-        let stored_group =
-            self.store.create_group(request).await.map_err(
-                err_with_context("create group failed!".to_string()),
-            )?;
+        let stored_members = if let Some(members) = &request.members {
+            self.get_group_members(members).await?
+        } else {
+            vec![]
+        };
 
-        let StoredParts { resource: group, meta } = stored_group.into();
+        let stored_group = self
+            .store
+            .create_group_with_members(request, stored_members.clone())
+            .await
+            .map_err(err_with_context("create group failed!".to_string()))?;
+
+        let StoredParts { resource: group, meta } =
+            StoredParts::<Group>::from(stored_group);
         SingleResourceResponse::from_resource(group, meta, None)
     }
 
@@ -181,15 +335,27 @@ impl<T: ProviderStore> Provider<T> {
         group_id: String,
         request: CreateGroupRequest,
     ) -> Result<SingleResourceResponse, Error> {
-        let stored_group =
-            self.store.replace_group(group_id.clone(), request).await.map_err(
-                err_with_context(format!(
-                    "replace group by id {group_id} failed!"
-                )),
-            )?;
+        let stored_members = if let Some(members) = &request.members {
+            self.get_group_members(members).await?
+        } else {
+            vec![]
+        };
 
-        let StoredParts { resource: user, meta } = stored_group.into();
-        SingleResourceResponse::from_resource(user, meta, None)
+        let stored_group = self
+            .store
+            .replace_group_with_members(
+                group_id.clone(),
+                request,
+                stored_members.clone(),
+            )
+            .await
+            .map_err(err_with_context(format!(
+                "replace group by id {group_id} failed!"
+            )))?;
+
+        let StoredParts { resource: group, meta } =
+            StoredParts::<Group>::from(stored_group);
+        SingleResourceResponse::from_resource(group, meta, None)
     }
 
     pub async fn delete_group(

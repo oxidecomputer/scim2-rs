@@ -202,17 +202,22 @@ impl ProviderStore for InMemoryProviderStore {
             .cloned())
     }
 
-    async fn create_group(
+    async fn create_group_with_members(
         &self,
         group_request: CreateGroupRequest,
+        members: Vec<StoredGroupMember>,
     ) -> Result<StoredGroup, ProviderStoreError> {
+        let CreateGroupRequest { display_name, external_id, members: _ } =
+            group_request;
+
         let new_group = StoredGroup {
             id: Uuid::new_v4().to_string(),
-            display_name: group_request.display_name,
-            external_id: group_request.external_id,
+            display_name,
+            external_id,
             created: Utc::now(),
             last_modified: Utc::now(),
             version: String::from("W/unimplemented"),
+            members,
         };
 
         let mut state = self.state.lock().unwrap();
@@ -244,24 +249,25 @@ impl ProviderStore for InMemoryProviderStore {
         Ok(groups)
     }
 
-    async fn replace_group(
+    async fn replace_group_with_members(
         &self,
         group_id: String,
         group_request: CreateGroupRequest,
+        members: Vec<StoredGroupMember>,
     ) -> Result<StoredGroup, ProviderStoreError> {
         let mut state = self.state.lock().unwrap();
-        let groups = &mut state.groups;
 
-        let index = match groups.iter().position(|group| group.id == group_id) {
-            None => {
-                return Err(Error::not_found(group_id).into());
-            }
+        let index =
+            match state.groups.iter().position(|group| group.id == group_id) {
+                None => {
+                    return Err(Error::not_found(group_id).into());
+                }
 
-            Some(index) => index,
-        };
+                Some(index) => index,
+            };
 
         // Update the modification time
-        groups[index].last_modified = Utc::now();
+        state.groups[index].last_modified = Utc::now();
 
         // RFC 7664 § 3.5.1:
         // Attributes whose mutability is "readWrite" that are omitted from the
@@ -270,18 +276,21 @@ impl ProviderStore for InMemoryProviderStore {
         // cleared, or the service provider MAY assign a default value to the
         // final resource representation.
 
-        let CreateGroupRequest { display_name, external_id } = group_request;
+        let CreateGroupRequest { display_name, external_id, members: _ } =
+            group_request;
 
-        groups[index].display_name = display_name;
+        state.groups[index].display_name = display_name;
 
         // This code takes the stance: if a provisioning client doesn't assert a
         // field, leave it alone: the IdP is the source of truth.
 
         if let Some(external_id) = external_id {
-            groups[index].external_id = Some(external_id);
+            state.groups[index].external_id = Some(external_id);
         }
 
-        Ok(groups[index].clone())
+        state.groups[index].members = members;
+
+        Ok(state.groups[index].clone())
     }
 
     async fn delete_group_by_id(
@@ -291,6 +300,52 @@ impl ProviderStore for InMemoryProviderStore {
         let mut state = self.state.lock().unwrap();
         let maybe_group =
             state.groups.extract_if(.., |group| group.id == group_id).next();
+
         Ok(maybe_group)
+    }
+
+    // Get all the groups that the user with id [`user_id`] is a member of. Note
+    // that this does not support nested groups.
+    async fn get_user_group_membership(
+        &self,
+        user_id: String,
+    ) -> Result<Vec<UserGroup>, ProviderStoreError> {
+        let state = self.state.lock().unwrap();
+
+        let mut user_group_members = vec![];
+
+        for group in state.groups.iter() {
+            if group.members.iter().any(|item| {
+                item.resource_type == ResourceType::User
+                    && item.value == user_id
+            }) {
+                user_group_members.push(UserGroup {
+                    member_type: Some(UserGroupType::Direct),
+                    value: Some(group.id.clone()),
+                    display: Some(group.display_name.clone()),
+                });
+            }
+        }
+
+        Ok(user_group_members)
+    }
+
+    // Return all the members of group given by [`group_id`]
+    async fn get_group_members(
+        &self,
+        group_id: String,
+    ) -> Result<Vec<StoredGroupMember>, ProviderStoreError> {
+        let state = self.state.lock().unwrap();
+
+        let index =
+            match state.groups.iter().position(|group| group.id == group_id) {
+                None => {
+                    return Err(Error::not_found(group_id).into());
+                }
+
+                Some(index) => index,
+            };
+
+        Ok(state.groups[index].members.clone())
     }
 }
