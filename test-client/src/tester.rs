@@ -7,13 +7,14 @@ use anyhow::bail;
 use reqwest::StatusCode;
 use reqwest::Url;
 use reqwest::blocking::Client;
-use scim2_rs::GroupMember;
+use reqwest::header;
 use serde::Serialize;
 use serde::de::DeserializeOwned;
 use serde_json::json;
 use std::str::FromStr;
 
 use scim2_rs::Group;
+use scim2_rs::GroupMember;
 use scim2_rs::ListResponse;
 use scim2_rs::Resource;
 use scim2_rs::ResourceType;
@@ -28,6 +29,21 @@ pub struct Tester {
 }
 
 impl Tester {
+    pub fn new_with_bearer_auth(
+        url: String,
+        bearer: String,
+    ) -> anyhow::Result<Self> {
+        let mut headers = header::HeaderMap::new();
+        headers.insert(
+            header::AUTHORIZATION,
+            header::HeaderValue::from_str(&bearer)?,
+        );
+
+        let client = Client::builder().default_headers(headers).build()?;
+
+        Ok(Self { url, client })
+    }
+
     pub fn new(url: String) -> Self {
         Self { url, client: Client::new() }
     }
