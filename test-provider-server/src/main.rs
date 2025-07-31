@@ -100,8 +100,10 @@ async fn main() -> anyhow::Result<()> {
 
     let store = scim2_rs::InMemoryProviderStore::new();
 
-    let ctx =
-        Arc::new(ServerContext { provider: scim2_rs::Provider::new(store) });
+    let plog = log.new(slog::o!("component" => "ScimProvider"));
+    let ctx = Arc::new(ServerContext {
+        provider: scim2_rs::Provider::new(plog, store),
+    });
 
     let http_server = HttpServerStarter::new(
         &config,
