@@ -114,10 +114,10 @@ impl InMemoryProviderStore {
 impl ProviderStore for InMemoryProviderStore {
     async fn get_user_by_id(
         &self,
-        user_id: String,
+        user_id: &str,
     ) -> Result<Option<StoredParts<User>>, ProviderStoreError> {
         let state = self.state.lock().unwrap();
-        Ok(state.users.get(&user_id).cloned())
+        Ok(state.users.get(user_id).cloned())
     }
 
     async fn create_user(
@@ -189,7 +189,7 @@ impl ProviderStore for InMemoryProviderStore {
 
     async fn replace_user(
         &self,
-        user_id: String,
+        user_id: &str,
         user_request: CreateUserRequest,
     ) -> Result<StoredParts<User>, ProviderStoreError> {
         let mut state = self.state.lock().unwrap();
@@ -211,8 +211,9 @@ impl ProviderStore for InMemoryProviderStore {
 
         // Can't replace a user that does not exist, so return 404 if it's not
         // found
-        let existing_user =
-            users.get_mut(&user_id).ok_or(Error::not_found(user_id.clone()))?;
+        let existing_user = users
+            .get_mut(user_id)
+            .ok_or(Error::not_found(user_id.to_string()))?;
 
         // RFC 7664 § 3.5.1:
         // Attributes whose mutability is "readWrite" that are omitted from the
@@ -227,7 +228,7 @@ impl ProviderStore for InMemoryProviderStore {
 
         *existing_user = StoredParts {
             resource: User {
-                id: user_id,
+                id: user_id.to_string(),
                 name: user_request.name,
                 external_id: user_request.external_id,
                 active: user_request.active,
@@ -249,19 +250,19 @@ impl ProviderStore for InMemoryProviderStore {
 
     async fn delete_user_by_id(
         &self,
-        user_id: String,
+        user_id: &str,
     ) -> Result<Option<StoredParts<User>>, ProviderStoreError> {
         let mut state = self.state.lock().unwrap();
-        let maybe_user = state.users.remove(&user_id);
+        let maybe_user = state.users.remove(user_id);
         Ok(maybe_user)
     }
 
     async fn get_group_by_id(
         &self,
-        group_id: String,
+        group_id: &str,
     ) -> Result<Option<StoredParts<Group>>, ProviderStoreError> {
         let state = self.state.lock().unwrap();
-        Ok(state.groups.get(&group_id).cloned())
+        Ok(state.groups.get(group_id).cloned())
     }
 
     async fn create_group(
@@ -370,7 +371,7 @@ impl ProviderStore for InMemoryProviderStore {
 
     async fn replace_group(
         &self,
-        group_id: String,
+        group_id: &str,
         group_request: CreateGroupRequest,
     ) -> Result<StoredParts<Group>, ProviderStoreError> {
         let mut state = self.state.lock().unwrap();
@@ -392,7 +393,7 @@ impl ProviderStore for InMemoryProviderStore {
         for stored_part in state.users.values_mut() {
             if let Some(groups) = &mut stored_part.resource.groups {
                 groups.retain(|user_group| {
-                    user_group.value.as_ref() != Some(&group_id)
+                    user_group.value.as_deref() != Some(group_id)
                 });
             }
         }
@@ -421,7 +422,7 @@ impl ProviderStore for InMemoryProviderStore {
                     .push(
                         UserGroup {
                             member_type: Some(UserGroupType::Direct),
-                            value: Some(group_id.clone()),
+                            value: Some(group_id.to_string()),
                             display: Some(display_name.clone()),
                         }
                     );
@@ -432,8 +433,8 @@ impl ProviderStore for InMemoryProviderStore {
         // found
         let existing_group = state
             .groups
-            .get_mut(&group_id)
-            .ok_or(Error::not_found(group_id.clone()))?;
+            .get_mut(group_id)
+            .ok_or(Error::not_found(group_id.to_string()))?;
 
         // RFC 7664 § 3.5.1:
         // Attributes whose mutability is "readWrite" that are omitted from the
@@ -448,7 +449,7 @@ impl ProviderStore for InMemoryProviderStore {
 
         *existing_group = StoredParts {
             resource: Group {
-                id: group_id,
+                id: group_id.to_string(),
                 display_name,
                 external_id,
                 members,
@@ -469,16 +470,16 @@ impl ProviderStore for InMemoryProviderStore {
 
     async fn delete_group_by_id(
         &self,
-        group_id: String,
+        group_id: &str,
     ) -> Result<Option<StoredParts<Group>>, ProviderStoreError> {
         let mut state = self.state.lock().unwrap();
 
-        let maybe_group = if let Some(group) = state.groups.remove(&group_id) {
+        let maybe_group = if let Some(group) = state.groups.remove(group_id) {
             // Delete all existing group membership for this group id
             for stored_part in state.users.values_mut() {
                 if let Some(groups) = &mut stored_part.resource.groups {
                     groups.retain(|user_group| {
-                        user_group.value.as_ref() != Some(&group_id)
+                        user_group.value.as_deref() != Some(group_id)
                     });
                 }
             }

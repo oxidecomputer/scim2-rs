@@ -68,18 +68,17 @@ impl<T: ProviderStore> Provider<T> {
     pub async fn get_user_by_id(
         &self,
         query_params: QueryParams,
-        user_id: String,
+        user_id: &str,
     ) -> Result<SingleResourceResponse, Error> {
-        let stored_user =
-            self.store.get_user_by_id(user_id.clone()).await.map_err(
-                err_with_context(format!("get user by id {user_id} failed!")),
-            )?;
+        let StoredParts { resource, meta } = self
+            .store
+            .get_user_by_id(user_id)
+            .await
+            .map_err(err_with_context(format!(
+                "get user by id {user_id} failed!"
+            )))?
+            .ok_or(Error::not_found(user_id.to_string()))?;
 
-        let Some(stored_user) = stored_user else {
-            return Err(Error::not_found(user_id));
-        };
-
-        let StoredParts { resource, meta } = stored_user;
         SingleResourceResponse::from_resource(
             resource,
             meta,
@@ -101,45 +100,43 @@ impl<T: ProviderStore> Provider<T> {
             }
         }
 
-        let stored_user = self
+        let StoredParts { resource, meta } = self
             .store
             .create_user(request)
             .await
             .map_err(err_with_context("create user failed!".to_string()))?;
 
-        let StoredParts { resource, meta } = stored_user;
         SingleResourceResponse::from_resource(resource, meta, None)
     }
 
     pub async fn replace_user(
         &self,
-        user_id: String,
+        user_id: &str,
         request: CreateUserRequest,
     ) -> Result<SingleResourceResponse, Error> {
-        let stored_user =
-            self.store.replace_user(user_id.clone(), request).await.map_err(
+        let StoredParts { resource, meta } =
+            self.store.replace_user(user_id, request).await.map_err(
                 err_with_context(format!(
                     "replace user by id {user_id} failed!"
                 )),
             )?;
 
-        let StoredParts { resource, meta } = stored_user;
         SingleResourceResponse::from_resource(resource, meta, None)
     }
 
     pub async fn patch_user(
         &self,
-        user_id: String,
+        user_id: &str,
         request: PatchRequest,
     ) -> Result<SingleResourceResponse, Error> {
-        let stored_user =
-            self.store.get_user_by_id(user_id.clone()).await.map_err(
-                err_with_context(format!("patch user by id {user_id} failed!")),
-            )?;
-
-        let Some(stored_user) = stored_user else {
-            return Err(Error::not_found(user_id));
-        };
+        let stored_user = self
+            .store
+            .get_user_by_id(user_id)
+            .await
+            .map_err(err_with_context(format!(
+                "patch user by id {user_id} failed!"
+            )))?
+            .ok_or(Error::not_found(user_id.to_string()))?;
 
         let StoredParts { resource: user, meta: _ } =
             request.apply_user_ops(&stored_user)?;
@@ -151,32 +148,25 @@ impl<T: ProviderStore> Provider<T> {
             groups: user.groups,
         };
 
-        let stored_user =
-            self.store.replace_user(user_id.clone(), request).await.map_err(
+        let StoredParts { resource, meta } =
+            self.store.replace_user(user_id, request).await.map_err(
                 err_with_context(format!(
                     "replace user by id {user_id} failed!"
                 )),
             )?;
 
-        let StoredParts { resource, meta } = stored_user;
         SingleResourceResponse::from_resource(resource, meta, None)
     }
 
     pub async fn delete_user(
         &self,
-        user_id: String,
+        user_id: &str,
     ) -> Result<Response<Body>, Error> {
-        let maybe_stored_user =
-            self.store.delete_user_by_id(user_id.clone()).await.map_err(
-                err_with_context(format!(
-                    "delete user by id {user_id} failed!"
-                )),
-            )?;
-
-        match maybe_stored_user {
+        match self.store.delete_user_by_id(user_id).await.map_err(
+            err_with_context(format!("delete user by id {user_id} failed!")),
+        )? {
             Some(_) => deleted_http_response(),
-
-            None => Err(Error::not_found(user_id)),
+            None => Err(Error::not_found(user_id.to_string())),
         }
     }
 
@@ -190,31 +180,22 @@ impl<T: ProviderStore> Provider<T> {
             .await
             .map_err(err_with_context("list groups failed!".to_string()))?;
 
-        let mut groups: Vec<StoredParts<Group>> =
-            Vec::with_capacity(stored_groups.len());
-
-        for stored_group in stored_groups {
-            groups.push(stored_group);
-        }
-
-        ListResponse::from_resources(groups, query_params)
+        ListResponse::from_resources(stored_groups, query_params)
     }
 
     pub async fn get_group_by_id(
         &self,
         query_params: QueryParams,
-        group_id: String,
+        group_id: &str,
     ) -> Result<SingleResourceResponse, Error> {
-        let stored_group =
-            self.store.get_group_by_id(group_id.clone()).await.map_err(
-                err_with_context(format!("get group by id {group_id} failed!")),
-            )?;
-
-        let Some(stored_group) = stored_group else {
-            return Err(Error::not_found(group_id));
-        };
-
-        let StoredParts { resource: group, meta } = stored_group;
+        let StoredParts { resource: group, meta } = self
+            .store
+            .get_group_by_id(group_id)
+            .await
+            .map_err(err_with_context(format!(
+                "get group by id {group_id} failed!"
+            )))?
+            .ok_or(Error::not_found(group_id.to_string()))?;
 
         SingleResourceResponse::from_resource::<Group>(
             group,
@@ -227,64 +208,54 @@ impl<T: ProviderStore> Provider<T> {
         &self,
         request: CreateGroupRequest,
     ) -> Result<SingleResourceResponse, Error> {
-        let stored_group =
+        let StoredParts { resource: group, meta } =
             self.store.create_group(request).await.map_err(
                 err_with_context("create group failed!".to_string()),
             )?;
 
-        let StoredParts { resource: group, meta } = stored_group;
         SingleResourceResponse::from_resource(group, meta, None)
     }
 
     pub async fn replace_group(
         &self,
-        group_id: String,
+        group_id: &str,
         request: CreateGroupRequest,
     ) -> Result<SingleResourceResponse, Error> {
-        let stored_group =
-            self.store.replace_group(group_id.clone(), request).await.map_err(
+        let StoredParts { resource: group, meta } =
+            self.store.replace_group(group_id, request).await.map_err(
                 err_with_context(format!(
                     "replace group by id {group_id} failed!"
                 )),
             )?;
 
-        let StoredParts { resource: group, meta } = stored_group;
         SingleResourceResponse::from_resource(group, meta, None)
     }
 
     pub async fn delete_group(
         &self,
-        group_id: String,
+        group_id: &str,
     ) -> Result<Response<Body>, Error> {
-        let maybe_stored_group =
-            self.store.delete_group_by_id(group_id.clone()).await.map_err(
-                err_with_context(format!(
-                    "delete group by id {group_id} failed!"
-                )),
-            )?;
-
-        match maybe_stored_group {
+        match self.store.delete_group_by_id(group_id).await.map_err(
+            err_with_context(format!("delete group by id {group_id} failed!")),
+        )? {
             Some(_) => deleted_http_response(),
-
-            None => Err(Error::not_found(group_id)),
+            None => Err(Error::not_found(group_id.to_string())),
         }
     }
 
     pub async fn patch_group(
         &self,
-        group_id: String,
+        group_id: &str,
         request: PatchRequest,
     ) -> Result<SingleResourceResponse, Error> {
-        let stored_group =
-            self.store.get_group_by_id(group_id.clone()).await.map_err(
-                err_with_context(format!(
-                    "patch group by id {group_id} failed!"
-                )),
-            )?;
-
-        let Some(stored_group) = stored_group else {
-            return Err(Error::not_found(group_id));
-        };
+        let stored_group = self
+            .store
+            .get_group_by_id(group_id)
+            .await
+            .map_err(err_with_context(format!(
+                "patch group by id {group_id} failed!"
+            )))?
+            .ok_or(Error::not_found(group_id.to_string()))?;
 
         let StoredParts { resource: group, meta: _ } =
             request.apply_group_ops(&stored_group)?;
