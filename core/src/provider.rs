@@ -164,8 +164,11 @@ impl<T: ProviderStore> Provider<T> {
                 format!("delete user by id {user_id} failed!"),
             ),
         )? {
-            Some(_) => deleted_http_response(),
-            None => Err(Error::not_found(user_id.to_string())),
+            ProviderStoreDeleteResult::Deleted => deleted_http_response(),
+
+            ProviderStoreDeleteResult::NotFound => {
+                Err(Error::not_found(user_id.to_string()))
+            }
         }
     }
 
@@ -247,8 +250,11 @@ impl<T: ProviderStore> Provider<T> {
                 format!("delete group by id {group_id} failed!"),
             ),
         )? {
-            Some(_) => deleted_http_response(),
-            None => Err(Error::not_found(group_id.to_string())),
+            ProviderStoreDeleteResult::Deleted => deleted_http_response(),
+
+            ProviderStoreDeleteResult::NotFound => {
+                Err(Error::not_found(group_id.to_string()))
+            }
         }
     }
 
