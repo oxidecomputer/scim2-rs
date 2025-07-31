@@ -44,7 +44,7 @@ pub async fn get_group(
 
     let result: Result<Response<Body>, http::Error> = match apictx
         .provider
-        .get_group_by_id(query_params, path_param.group_id)
+        .get_group_by_id(query_params, &path_param.group_id)
         .await
     {
         Ok(response) => response.to_http_response(StatusCode::OK),
@@ -92,12 +92,14 @@ pub async fn put_group(
     let path_param = path_param.into_inner();
     let request = body.into_inner();
 
-    let result: Result<Response<Body>, http::Error> =
-        match apictx.provider.replace_group(path_param.group_id, request).await
-        {
-            Ok(response) => response.to_http_response(StatusCode::OK),
-            Err(error) => error.to_http_response(),
-        };
+    let result: Result<Response<Body>, http::Error> = match apictx
+        .provider
+        .replace_group(&path_param.group_id, request)
+        .await
+    {
+        Ok(response) => response.to_http_response(StatusCode::OK),
+        Err(error) => error.to_http_response(),
+    };
 
     result.map_err(HttpError::from)
 }
@@ -119,7 +121,7 @@ pub async fn delete_group(
     let path_param = path_param.into_inner();
 
     let result: Result<Response<Body>, http::Error> =
-        match apictx.provider.delete_group(path_param.group_id).await {
+        match apictx.provider.delete_group(&path_param.group_id).await {
             Ok(response) => Ok(response),
             Err(error) => error.to_http_response(),
         };
@@ -146,7 +148,7 @@ pub async fn patch_group(
 
     let result: Result<Response<Body>, http::Error> = match apictx
         .provider
-        .patch_group(path_param.group_id, body.into_inner())
+        .patch_group(&path_param.group_id, body.into_inner())
         .await
     {
         Ok(response) => response.to_http_response(StatusCode::OK),
