@@ -12,6 +12,7 @@ use serde::Serialize;
 use serde::de::DeserializeOwned;
 use serde_json::json;
 use std::str::FromStr;
+use uuid::Uuid;
 
 use scim2_rs::Group;
 use scim2_rs::GroupMember;
@@ -36,7 +37,7 @@ impl Tester {
         let mut headers = header::HeaderMap::new();
         headers.insert(
             header::AUTHORIZATION,
-            header::HeaderValue::from_str(&bearer)?,
+            header::HeaderValue::from_str(&format!("Bearer {bearer}"))?,
         );
 
         let client = Client::builder().default_headers(headers).build()?;
@@ -127,7 +128,7 @@ impl Tester {
     }
 
     fn nonexistent_resource_tests(&self) -> anyhow::Result<()> {
-        let random_id = "999999";
+        let random_id = Uuid::new_v4().to_string();
 
         // A GET of non-existent user = 404
         let result = self
