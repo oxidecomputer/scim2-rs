@@ -78,7 +78,6 @@ struct Args {
     bind_addr: SocketAddr,
 }
 
-#[allow(clippy::disallowed_macros)]
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
     let opt: Args = Args::try_parse()?;
