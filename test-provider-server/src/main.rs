@@ -78,8 +78,6 @@ struct Args {
     bind_addr: SocketAddr,
 }
 
-// NOTE: This is a test server used for development / testing and is not
-// deployed to production so we allow `tokio::main`.
 #[allow(clippy::disallowed_macros)]
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
