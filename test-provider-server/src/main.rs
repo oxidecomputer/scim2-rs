@@ -78,6 +78,9 @@ struct Args {
     bind_addr: SocketAddr,
 }
 
+// NOTE: This is a test server used for development / testing and is not
+// deployed to production so we allow `tokio::main`.
+#[allow(clippy::disallowed_macros)]
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
     let opt: Args = Args::try_parse()?;
@@ -100,8 +103,10 @@ async fn main() -> anyhow::Result<()> {
 
     let store = scim2_rs::InMemoryProviderStore::new();
 
-    let ctx =
-        Arc::new(ServerContext { provider: scim2_rs::Provider::new(store) });
+    let plog = log.new(slog::o!("component" => "ScimProvider"));
+    let ctx = Arc::new(ServerContext {
+        provider: scim2_rs::Provider::new(plog, store),
+    });
 
     let http_server = HttpServerStarter::new(
         &config,
