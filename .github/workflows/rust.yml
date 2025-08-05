@@ -44,4 +44,4 @@ jobs:
     - name: Report Clippy version
       run: cargo clippy -- --version
     - name: Run Clippy Lints
-      run: cargo clippy --deny warnings 
+      run: cargo clippy --all-targets --workspace -- --deny warnings 
