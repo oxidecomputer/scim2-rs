@@ -253,7 +253,7 @@ impl ProviderStore for InMemoryProviderStore {
         user_id: &str,
     ) -> Result<bool, ProviderStoreError> {
         let mut state = self.state.lock().unwrap();
-        let maybe_user = state.users.remove(&user_id);
+        let maybe_user = state.users.remove(user_id);
         Ok(maybe_user.is_some())
     }
 
@@ -474,7 +474,7 @@ impl ProviderStore for InMemoryProviderStore {
     ) -> Result<bool, ProviderStoreError> {
         let mut state = self.state.lock().unwrap();
 
-        let present = if state.groups.remove(&group_id).is_some() {
+        let present = if state.groups.remove(group_id).is_some() {
             // Delete all existing group membership for this group id
             for stored_part in state.users.values_mut() {
                 if let Some(groups) = &mut stored_part.resource.groups {
