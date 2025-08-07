@@ -12,6 +12,7 @@ use serde::Serialize;
 use serde::de::DeserializeOwned;
 use serde_json::json;
 use std::str::FromStr;
+use uuid::Uuid;
 
 use scim2_rs::Group;
 use scim2_rs::GroupMember;
@@ -1084,7 +1085,7 @@ impl Tester {
               "displayName": "Sales Reps",
               "members": [
                 {
-                  "value": "999999",
+                  "value": Uuid::new_v4().to_string(),
                 }
               ]
             }
