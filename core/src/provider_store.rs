@@ -33,7 +33,7 @@ pub trait ProviderStore: Sync {
     async fn delete_user_by_id(
         &self,
         user_id: &str,
-    ) -> Result<bool, ProviderStoreError>;
+    ) -> Result<ProviderStoreDeleteResult, ProviderStoreError>;
 
     async fn get_group_by_id(
         &self,
@@ -63,7 +63,7 @@ pub trait ProviderStore: Sync {
     async fn delete_group_by_id(
         &self,
         group_id: &str,
-    ) -> Result<bool, ProviderStoreError>;
+    ) -> Result<ProviderStoreDeleteResult, ProviderStoreError>;
 }
 
 /// The backing store for users and groups may throw its own error type, or it
@@ -83,4 +83,10 @@ impl From<anyhow::Error> for ProviderStoreError {
     fn from(e: anyhow::Error) -> ProviderStoreError {
         ProviderStoreError::StoreError(e)
     }
+}
+
+#[derive(Debug)]
+pub enum ProviderStoreDeleteResult {
+    NotFound,
+    Deleted,
 }

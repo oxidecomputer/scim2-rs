@@ -162,12 +162,14 @@ impl<T: ProviderStore> Provider<T> {
         &self,
         user_id: &str,
     ) -> Result<Response<Body>, Error> {
-        if self.store.delete_user_by_id(user_id).await.map_err(
+        match self.store.delete_user_by_id(user_id).await.map_err(
             err_with_context(format!("delete user by id {user_id} failed!")),
         )? {
-            deleted_http_response()
-        } else {
-            Err(Error::not_found(user_id.to_string()))
+            ProviderStoreDeleteResult::Deleted => deleted_http_response(),
+
+            ProviderStoreDeleteResult::NotFound => {
+                Err(Error::not_found(user_id.to_string()))
+            }
         }
     }
 
@@ -236,12 +238,14 @@ impl<T: ProviderStore> Provider<T> {
         &self,
         group_id: &str,
     ) -> Result<Response<Body>, Error> {
-        if self.store.delete_group_by_id(group_id).await.map_err(
+        match self.store.delete_group_by_id(group_id).await.map_err(
             err_with_context(format!("delete group by id {group_id} failed!")),
         )? {
-            deleted_http_response()
-        } else {
-            Err(Error::not_found(group_id.to_string()))
+            ProviderStoreDeleteResult::Deleted => deleted_http_response(),
+
+            ProviderStoreDeleteResult::NotFound => {
+                Err(Error::not_found(group_id.to_string()))
+            }
         }
     }
 
