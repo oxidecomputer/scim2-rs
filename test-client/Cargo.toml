@@ -9,5 +9,6 @@ clap.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 reqwest.workspace = true
+uuid.workspace = true
 
 scim2-rs = { path = "../core" }

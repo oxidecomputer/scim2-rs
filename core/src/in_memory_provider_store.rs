@@ -251,10 +251,17 @@ impl ProviderStore for InMemoryProviderStore {
     async fn delete_user_by_id(
         &self,
         user_id: &str,
-    ) -> Result<Option<StoredParts<User>>, ProviderStoreError> {
+    ) -> Result<ProviderStoreDeleteResult, ProviderStoreError> {
         let mut state = self.state.lock().unwrap();
         let maybe_user = state.users.remove(user_id);
-        Ok(maybe_user)
+
+        let result = if maybe_user.is_some() {
+            ProviderStoreDeleteResult::Deleted
+        } else {
+            ProviderStoreDeleteResult::NotFound
+        };
+
+        Ok(result)
     }
 
     async fn get_group_by_id(
@@ -471,10 +478,10 @@ impl ProviderStore for InMemoryProviderStore {
     async fn delete_group_by_id(
         &self,
         group_id: &str,
-    ) -> Result<Option<StoredParts<Group>>, ProviderStoreError> {
+    ) -> Result<ProviderStoreDeleteResult, ProviderStoreError> {
         let mut state = self.state.lock().unwrap();
 
-        let maybe_group = if let Some(group) = state.groups.remove(group_id) {
+        let result = if state.groups.remove(group_id).is_some() {
             // Delete all existing group membership for this group id
             for stored_part in state.users.values_mut() {
                 if let Some(groups) = &mut stored_part.resource.groups {
@@ -484,11 +491,11 @@ impl ProviderStore for InMemoryProviderStore {
                 }
             }
 
-            Some(group)
+            ProviderStoreDeleteResult::Deleted
         } else {
-            None
+            ProviderStoreDeleteResult::NotFound
         };
 
-        Ok(maybe_group)
+        Ok(result)
     }
 }

@@ -28,12 +28,12 @@ pub trait ProviderStore: Sync {
         user_request: CreateUserRequest,
     ) -> Result<StoredParts<User>, ProviderStoreError>;
 
-    // A Some(User) is returned if the User existed prior to the delete,
-    // otherwise None is returned.
+    // true is returned if the User existed prior to the delete, otherwise false
+    // is returned.
     async fn delete_user_by_id(
         &self,
         user_id: &str,
-    ) -> Result<Option<StoredParts<User>>, ProviderStoreError>;
+    ) -> Result<ProviderStoreDeleteResult, ProviderStoreError>;
 
     async fn get_group_by_id(
         &self,
@@ -58,12 +58,12 @@ pub trait ProviderStore: Sync {
 
     // Delete a group, and all group memberships.
     //
-    // A Some(Group) is returned if the Group existed prior to the delete,
-    // otherwise None is returned.
+    // true is returned if the Group existed prior to the delete, otherwise
+    // false is returned.
     async fn delete_group_by_id(
         &self,
         group_id: &str,
-    ) -> Result<Option<StoredParts<Group>>, ProviderStoreError>;
+    ) -> Result<ProviderStoreDeleteResult, ProviderStoreError>;
 }
 
 /// The backing store for users and groups may throw its own error type, or it
@@ -83,4 +83,10 @@ impl From<anyhow::Error> for ProviderStoreError {
     fn from(e: anyhow::Error) -> ProviderStoreError {
         ProviderStoreError::StoreError(e)
     }
+}
+
+#[derive(Debug)]
+pub enum ProviderStoreDeleteResult {
+    NotFound,
+    Deleted,
 }

@@ -1563,6 +1563,7 @@ dependencies = [
  "scim2-rs",
  "serde",
  "serde_json",
+ "uuid 1.17.0",
 ]
 
 [[package]]
