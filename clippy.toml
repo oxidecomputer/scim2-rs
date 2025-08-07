@@ -1,0 +1,12 @@
+disallowed-methods = [
+    # We use disallowed-methods for these rather than disallowed-types, because
+    # there's still one legitimate use for `once_cell`'s types:
+    # `get_or_try_init`, which isn't stablet yet.
+    # https://github.com/rust-lang/rust/issues/109737
+    { path = "once_cell::unsync::OnceCell::get_or_init", reason = "use `std::cell::OnceCell` instead, unless you need get_or_try_init in which case #[expect] this lint" },
+    { path = "once_cell::sync::OnceCell::get_or_init", reason = "use `std::sync::OnceLock` instead, unless you need get_or_try_init in which case #[expect] this lint" },
+]
+disallowed-types = [
+    { path = "once_cell::unsync::Lazy", reason = "use `std::cell::LazyCell` instead" },
+    { path = "once_cell::sync::Lazy", reason = "use `std::sync::LazyLock` instead" },
+]
