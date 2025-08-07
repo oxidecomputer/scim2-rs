@@ -44,7 +44,7 @@ pub async fn get_user(
 
     let result: Result<Response<Body>, http::Error> = match apictx
         .provider
-        .get_user_by_id(query_params, path_param.user_id)
+        .get_user_by_id(query_params, &path_param.user_id)
         .await
     {
         Ok(response) => response.to_http_response(StatusCode::OK),
@@ -92,11 +92,14 @@ pub async fn put_user(
     let path_param = path_param.into_inner();
     let request = body.into_inner();
 
-    let result: Result<Response<Body>, http::Error> =
-        match apictx.provider.replace_user(path_param.user_id, request).await {
-            Ok(response) => response.to_http_response(StatusCode::OK),
-            Err(error) => error.to_http_response(),
-        };
+    let result: Result<Response<Body>, http::Error> = match apictx
+        .provider
+        .replace_user(&path_param.user_id, request)
+        .await
+    {
+        Ok(response) => response.to_http_response(StatusCode::OK),
+        Err(error) => error.to_http_response(),
+    };
 
     result.map_err(HttpError::from)
 }
@@ -118,7 +121,7 @@ pub async fn delete_user(
     let path_param = path_param.into_inner();
 
     let result: Result<Response<Body>, http::Error> =
-        match apictx.provider.delete_user(path_param.user_id).await {
+        match apictx.provider.delete_user(&path_param.user_id).await {
             Ok(response) => Ok(response),
             Err(error) => error.to_http_response(),
         };
@@ -145,7 +148,7 @@ pub async fn patch_user(
 
     let result: Result<Response<Body>, http::Error> = match apictx
         .provider
-        .patch_user(path_param.user_id, body.into_inner())
+        .patch_user(&path_param.user_id, body.into_inner())
         .await
     {
         Ok(response) => response.to_http_response(StatusCode::OK),

@@ -2,6 +2,13 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 
+use http::header;
+use schemars::{
+    SchemaGenerator,
+    schema::{InstanceType, Schema, SchemaObject},
+};
+use serde::Deserializer;
+
 use super::*;
 
 const CONTENT_TYPE_SCIM_JSON: &str = "application/scim+json";
@@ -66,27 +73,11 @@ impl ListResponse {
     }
 
     pub fn to_http_response(self) -> Result<Response<Body>, http::Error> {
-        match serde_json::to_string(&self) {
-            Ok(serialized) => Response::builder()
-                .status(200)
-                .header("Content-Type", CONTENT_TYPE_SCIM_JSON)
-                .body(serialized.into()),
-
-            Err(e) => Response::builder()
-                .status(500)
-                .header("Content-Type", CONTENT_TYPE_SCIM_JSON)
-                .body(
-                    serde_json::json!(
-                        {
-                        "schemas": ["urn:ietf:params:scim:api:messages:2.0:Error"],
-                        "status": 500,
-                        "detail": format!("serializing error failed: {e}"),
-                        }
-                    )
-                    .to_string()
-                    .into(),
-                ),
-        }
+        value_to_http_response(
+            StatusCode::OK,
+            &self,
+            "serializing list response failed",
+        )
     }
 }
 
@@ -146,27 +137,11 @@ impl SingleResourceResponse {
         self,
         status_code: StatusCode,
     ) -> Result<Response<Body>, http::Error> {
-        match serde_json::to_string(&self) {
-            Ok(serialized) => Response::builder()
-                .status(status_code)
-                .header("Content-Type", CONTENT_TYPE_SCIM_JSON)
-                .body(serialized.into()),
-
-            Err(e) => Response::builder()
-                .status(500)
-                .header("Content-Type", CONTENT_TYPE_SCIM_JSON)
-                .body(
-                    serde_json::json!(
-                        {
-                        "schemas": ["urn:ietf:params:scim:api:messages:2.0:Error"],
-                        "status": 500,
-                        "detail": format!("serializing error failed: {e}"),
-                        }
-                    )
-                    .to_string()
-                    .into(),
-                ),
-        }
+        value_to_http_response(
+            status_code,
+            &self,
+            "serializing resource failed",
+        )
     }
 }
 
@@ -187,12 +162,41 @@ pub enum ErrorType {
     Mutability,
 }
 
+fn status_to_string<S>(
+    status: &StatusCode,
+    serializer: S,
+) -> Result<S::Ok, S::Error>
+where
+    S: serde::Serializer,
+{
+    serializer.serialize_str(status.as_str())
+}
+
+fn string_to_status<'de, D>(deserializer: D) -> Result<StatusCode, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    let s: &str = Deserialize::deserialize(deserializer)?;
+    s.parse::<StatusCode>().map_err(serde::de::Error::custom)
+}
+
+fn status_code_schema(_: &mut SchemaGenerator) -> Schema {
+    SchemaObject {
+        instance_type: Some(InstanceType::String.into()),
+        ..Default::default()
+    }
+    .into()
+}
+
 /// The SCIM error format is specified in RFC 7644, section 3.12
 #[derive(Deserialize, Serialize, JsonSchema, Debug)]
 pub struct Error {
     pub schemas: Vec<String>,
 
-    pub status: String,
+    #[serde(serialize_with = "status_to_string")]
+    #[serde(deserialize_with = "string_to_status")]
+    #[schemars(schema_with = "status_code_schema")]
+    pub status: StatusCode,
 
     #[serde(skip_serializing_if = "Option::is_none")]
     #[serde(rename = "scimType")]
@@ -211,7 +215,7 @@ impl Error {
             schemas: vec![String::from(
                 "urn:ietf:params:scim:api:messages:2.0:Error",
             )],
-            status: status.as_str().to_string(),
+            status,
             error_type,
             detail,
         }
@@ -261,53 +265,12 @@ impl Error {
         Self::new(StatusCode::BAD_REQUEST, Some(ErrorType::Mutability), detail)
     }
 
-    pub fn status(&self) -> Result<u16, std::num::ParseIntError> {
-        self.status.parse()
+    pub fn status(&self) -> StatusCode {
+        self.status
     }
 
     pub fn to_http_response(self) -> Result<Response<Body>, http::Error> {
-        let status = match self.status() {
-            Ok(status) => status,
-
-            Err(e) => {
-                return Response::builder()
-                .status(500)
-                .header("Content-Type", CONTENT_TYPE_SCIM_JSON)
-                .body(
-                    serde_json::json!(
-                        {
-                        "schemas": ["urn:ietf:params:scim:api:messages:2.0:Error"],
-                        "status": 500,
-                        "detail": format!("parsing {} as u16 failed: {e}", self.status),
-                        }
-                    )
-                    .to_string()
-                    .into(),
-                )
-            }
-        };
-
-        match serde_json::to_string(&self) {
-            Ok(serialized) => Response::builder()
-                .status(status)
-                .header("Content-Type", CONTENT_TYPE_SCIM_JSON)
-                .body(serialized.into()),
-
-            Err(e) => Response::builder()
-                .status(500)
-                .header("Content-Type", CONTENT_TYPE_SCIM_JSON)
-                .body(
-                    serde_json::json!(
-                        {
-                        "schemas": ["urn:ietf:params:scim:api:messages:2.0:Error"],
-                        "status": 500,
-                        "detail": format!("serializing error failed: {e}"),
-                        }
-                    )
-                    .to_string()
-                    .into(),
-                ),
-        }
+        value_to_http_response(self.status, &self, "serializing error failed")
     }
 }
 
@@ -322,10 +285,38 @@ impl From<PatchRequestError> for Error {
     }
 }
 
+pub fn value_to_http_response<S: Serialize>(
+    status_code: StatusCode,
+    value: &S,
+    error_context: &str,
+) -> Result<Response<Body>, http::Error> {
+    match serde_json::to_string(value) {
+        Ok(serialized) => Response::builder()
+            .status(status_code)
+            .header(header::CONTENT_TYPE, CONTENT_TYPE_SCIM_JSON)
+            .body(serialized.into()),
+
+        Err(e) => Response::builder()
+            .status(StatusCode::INTERNAL_SERVER_ERROR)
+            .header(header::CONTENT_TYPE, CONTENT_TYPE_SCIM_JSON)
+            .body(
+                serde_json::json!(
+                    {
+                    "schemas": ["urn:ietf:params:scim:api:messages:2.0:Error"],
+                    "status": 500,
+                    "detail": format!("{error_context}: {e}"),
+                    }
+                )
+                .to_string()
+                .into(),
+            ),
+    }
+}
+
 pub fn deleted_http_response() -> Result<Response<Body>, Error> {
     Response::builder()
         .status(StatusCode::NO_CONTENT)
-        .header("Content-Type", CONTENT_TYPE_SCIM_JSON)
+        .header(header::CONTENT_TYPE, CONTENT_TYPE_SCIM_JSON)
         .body(Body::empty())
         .map_err(|e| Error::internal_error(format!("{e}")))
 }

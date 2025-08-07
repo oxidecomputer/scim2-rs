@@ -9,7 +9,7 @@ use super::*;
 pub trait ProviderStore: Sync {
     async fn get_user_by_id(
         &self,
-        user_id: String,
+        user_id: &str,
     ) -> Result<Option<StoredParts<User>>, ProviderStoreError>;
 
     async fn create_user(
@@ -24,7 +24,7 @@ pub trait ProviderStore: Sync {
 
     async fn replace_user(
         &self,
-        user_id: String,
+        user_id: &str,
         user_request: CreateUserRequest,
     ) -> Result<StoredParts<User>, ProviderStoreError>;
 
@@ -32,12 +32,12 @@ pub trait ProviderStore: Sync {
     // is returned.
     async fn delete_user_by_id(
         &self,
-        user_id: String,
+        user_id: &str,
     ) -> Result<bool, ProviderStoreError>;
 
     async fn get_group_by_id(
         &self,
-        group_id: String,
+        group_id: &str,
     ) -> Result<Option<StoredParts<Group>>, ProviderStoreError>;
 
     async fn create_group(
@@ -52,7 +52,7 @@ pub trait ProviderStore: Sync {
 
     async fn replace_group(
         &self,
-        group_id: String,
+        group_id: &str,
         group_request: CreateGroupRequest,
     ) -> Result<StoredParts<Group>, ProviderStoreError>;
 
@@ -62,7 +62,7 @@ pub trait ProviderStore: Sync {
     // false is returned.
     async fn delete_group_by_id(
         &self,
-        group_id: String,
+        group_id: &str,
     ) -> Result<bool, ProviderStoreError>;
 }
 

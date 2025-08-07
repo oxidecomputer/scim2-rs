@@ -286,7 +286,7 @@ impl Tester {
 
         let error: scim2_rs::Error = conflict_result.json()?;
 
-        if error.status()? != StatusCode::CONFLICT {
+        if error.status() != StatusCode::CONFLICT {
             bail!(
                 "SCIM error struct's status is {} instead of {}",
                 error.status,
@@ -549,7 +549,7 @@ impl Tester {
 
         let error: scim2_rs::Error = result.json()?;
 
-        if error.status()? != StatusCode::CONFLICT {
+        if error.status() != StatusCode::CONFLICT {
             bail!(
                 "SCIM error struct's status is {} instead of {}",
                 error.status,
