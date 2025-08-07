@@ -1550,6 +1550,7 @@ dependencies = [
  "schemars",
  "serde",
  "serde_json",
+ "slog",
  "uuid 1.17.0",
 ]
 

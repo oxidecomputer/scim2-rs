@@ -2,54 +2,42 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 
+use slog::{Logger, error};
+
 use super::*;
 
-struct MappedError {
-    inner: ProviderStoreError,
+fn provider_error_to_error(
+    log: &Logger,
     context: String,
-}
-
-impl From<MappedError> for Error {
-    fn from(value: MappedError) -> Self {
-        match value.inner {
-            ProviderStoreError::StoreError(error) => {
-                // XXX we want to use err_chain here probably...
-                Error::internal_error(format!("{} {error}", value.context))
+) -> impl FnOnce(ProviderStoreError) -> Error {
+    move |error| {
+        match error {
+            ProviderStoreError::StoreError(mut error) => {
+                // Add context to the anyhow error and log it for our own records
+                // and only pass along the context message to outside consumers of
+                // the API.
+                error = error.context(context.clone());
+                // NB: Using the "#?" formatter is load bearing as it will
+                // inline the entire error chain.
+                error!(log, "{error:#?}");
+                Error::internal_error(context)
             }
+            // We don't log the raw scim error json
             ProviderStoreError::Scim(error) => error,
         }
     }
 }
 
-impl ProviderStoreError {
-    fn with_context(self, context: String) -> MappedError {
-        match self {
-            inner @ ProviderStoreError::StoreError(_) => {
-                MappedError { inner, context }
-            }
-            inner @ ProviderStoreError::Scim(_) => {
-                MappedError { inner, context: String::new() }
-            }
-        }
-    }
-}
-
-/// Create a `MappedError` with the provided context
-fn err_with_context(
-    context: String,
-) -> impl FnOnce(ProviderStoreError) -> MappedError {
-    move |e| e.with_context(context)
-}
-
 /// Provider implements SCIM CRUD over some provider store, transforming the
 /// Rust types returned by that store into the generic SCIM response types.
 pub struct Provider<T: ProviderStore> {
+    log: Logger,
     store: T,
 }
 
 impl<T: ProviderStore> Provider<T> {
-    pub fn new(store: T) -> Self {
-        Self { store }
+    pub fn new(log: Logger, store: T) -> Self {
+        Self { log, store }
     }
 
     pub async fn list_users(
@@ -57,10 +45,12 @@ impl<T: ProviderStore> Provider<T> {
         query_params: QueryParams,
     ) -> Result<ListResponse, Error> {
         let stored_users =
-            self.store
-                .list_users(query_params.filter())
-                .await
-                .map_err(err_with_context("list users failed!".to_string()))?;
+            self.store.list_users(query_params.filter()).await.map_err(
+                provider_error_to_error(
+                    &self.log,
+                    "list users failed!".to_string(),
+                ),
+            )?;
 
         ListResponse::from_resources(stored_users, query_params)
     }
@@ -74,9 +64,10 @@ impl<T: ProviderStore> Provider<T> {
             .store
             .get_user_by_id(user_id)
             .await
-            .map_err(err_with_context(format!(
-                "get user by id {user_id} failed!"
-            )))?
+            .map_err(provider_error_to_error(
+                &self.log,
+                format!("get user by id {user_id} failed!"),
+            ))?
             .ok_or(Error::not_found(user_id.to_string()))?;
 
         SingleResourceResponse::from_resource(
@@ -100,11 +91,13 @@ impl<T: ProviderStore> Provider<T> {
             }
         }
 
-        let StoredParts { resource, meta } = self
-            .store
-            .create_user(request)
-            .await
-            .map_err(err_with_context("create user failed!".to_string()))?;
+        let StoredParts { resource, meta } =
+            self.store.create_user(request).await.map_err(
+                provider_error_to_error(
+                    &self.log,
+                    "create user failed!".to_string(),
+                ),
+            )?;
 
         SingleResourceResponse::from_resource(resource, meta, None)
     }
@@ -116,9 +109,10 @@ impl<T: ProviderStore> Provider<T> {
     ) -> Result<SingleResourceResponse, Error> {
         let StoredParts { resource, meta } =
             self.store.replace_user(user_id, request).await.map_err(
-                err_with_context(format!(
-                    "replace user by id {user_id} failed!"
-                )),
+                provider_error_to_error(
+                    &self.log,
+                    format!("replace user by id {user_id} failed!"),
+                ),
             )?;
 
         SingleResourceResponse::from_resource(resource, meta, None)
@@ -133,9 +127,10 @@ impl<T: ProviderStore> Provider<T> {
             .store
             .get_user_by_id(user_id)
             .await
-            .map_err(err_with_context(format!(
-                "patch user by id {user_id} failed!"
-            )))?
+            .map_err(provider_error_to_error(
+                &self.log,
+                format!("patch user by id {user_id} failed!"),
+            ))?
             .ok_or(Error::not_found(user_id.to_string()))?;
 
         let StoredParts { resource: user, meta: _ } =
@@ -150,9 +145,10 @@ impl<T: ProviderStore> Provider<T> {
 
         let StoredParts { resource, meta } =
             self.store.replace_user(user_id, request).await.map_err(
-                err_with_context(format!(
-                    "replace user by id {user_id} failed!"
-                )),
+                provider_error_to_error(
+                    &self.log,
+                    format!("replace user by id {user_id} failed!"),
+                ),
             )?;
 
         SingleResourceResponse::from_resource(resource, meta, None)
@@ -163,7 +159,10 @@ impl<T: ProviderStore> Provider<T> {
         user_id: &str,
     ) -> Result<Response<Body>, Error> {
         match self.store.delete_user_by_id(user_id).await.map_err(
-            err_with_context(format!("delete user by id {user_id} failed!")),
+            provider_error_to_error(
+                &self.log,
+                format!("delete user by id {user_id} failed!"),
+            ),
         )? {
             ProviderStoreDeleteResult::Deleted => deleted_http_response(),
 
@@ -177,11 +176,13 @@ impl<T: ProviderStore> Provider<T> {
         &self,
         query_params: QueryParams,
     ) -> Result<ListResponse, Error> {
-        let stored_groups = self
-            .store
-            .list_groups(query_params.filter())
-            .await
-            .map_err(err_with_context("list groups failed!".to_string()))?;
+        let stored_groups =
+            self.store.list_groups(query_params.filter()).await.map_err(
+                provider_error_to_error(
+                    &self.log,
+                    "list groups failed!".to_string(),
+                ),
+            )?;
 
         ListResponse::from_resources(stored_groups, query_params)
     }
@@ -195,9 +196,10 @@ impl<T: ProviderStore> Provider<T> {
             .store
             .get_group_by_id(group_id)
             .await
-            .map_err(err_with_context(format!(
-                "get group by id {group_id} failed!"
-            )))?
+            .map_err(provider_error_to_error(
+                &self.log,
+                format!("get group by id {group_id} failed!"),
+            ))?
             .ok_or(Error::not_found(group_id.to_string()))?;
 
         SingleResourceResponse::from_resource::<Group>(
@@ -213,7 +215,10 @@ impl<T: ProviderStore> Provider<T> {
     ) -> Result<SingleResourceResponse, Error> {
         let StoredParts { resource: group, meta } =
             self.store.create_group(request).await.map_err(
-                err_with_context("create group failed!".to_string()),
+                provider_error_to_error(
+                    &self.log,
+                    "create group failed!".to_string(),
+                ),
             )?;
 
         SingleResourceResponse::from_resource(group, meta, None)
@@ -226,9 +231,10 @@ impl<T: ProviderStore> Provider<T> {
     ) -> Result<SingleResourceResponse, Error> {
         let StoredParts { resource: group, meta } =
             self.store.replace_group(group_id, request).await.map_err(
-                err_with_context(format!(
-                    "replace group by id {group_id} failed!"
-                )),
+                provider_error_to_error(
+                    &self.log,
+                    format!("replace group by id {group_id} failed!"),
+                ),
             )?;
 
         SingleResourceResponse::from_resource(group, meta, None)
@@ -239,7 +245,10 @@ impl<T: ProviderStore> Provider<T> {
         group_id: &str,
     ) -> Result<Response<Body>, Error> {
         match self.store.delete_group_by_id(group_id).await.map_err(
-            err_with_context(format!("delete group by id {group_id} failed!")),
+            provider_error_to_error(
+                &self.log,
+                format!("delete group by id {group_id} failed!"),
+            ),
         )? {
             ProviderStoreDeleteResult::Deleted => deleted_http_response(),
 
@@ -258,9 +267,10 @@ impl<T: ProviderStore> Provider<T> {
             .store
             .get_group_by_id(group_id)
             .await
-            .map_err(err_with_context(format!(
-                "patch group by id {group_id} failed!"
-            )))?
+            .map_err(provider_error_to_error(
+                &self.log,
+                format!("patch group by id {group_id} failed!"),
+            ))?
             .ok_or(Error::not_found(group_id.to_string()))?;
 
         let StoredParts { resource: group, meta: _ } =
