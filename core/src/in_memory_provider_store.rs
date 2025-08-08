@@ -499,3 +499,317 @@ impl ProviderStore for InMemoryProviderStore {
         Ok(result)
     }
 }
+
+#[cfg(test)]
+mod test {
+    use anyhow::bail;
+    use http::StatusCode;
+    use reqwest::{Response, Url};
+    use serde::{Serialize, de::DeserializeOwned};
+    use serde_json::json;
+
+    use crate::{
+        ListResponse, Resource, SingleResourceResponse, StoredMeta,
+        StoredParts, User,
+    };
+
+    struct ServerCtx {
+        base_url: Url,
+        client: reqwest::Client,
+        _server_handle: tokio::task::JoinHandle<Result<(), String>>,
+    }
+
+    async fn setup() -> anyhow::Result<ServerCtx> {
+        let server =
+            scim2_test_provider_server::create_http_server(None).unwrap();
+        let addr = server.local_addr();
+        let base_url = format!("http://{addr}/v2").parse().unwrap();
+        let server_handle = tokio::spawn(server);
+        let client = reqwest::Client::new();
+
+        Ok(ServerCtx { base_url, client, _server_handle: server_handle })
+    }
+
+    async fn result_as_resource<R>(
+        result: reqwest::Response,
+    ) -> anyhow::Result<StoredParts<R>>
+    where
+        R: Resource + DeserializeOwned + Serialize,
+    {
+        let response: SingleResourceResponse = result.json().await?;
+
+        if !response.resource.schemas.contains(&R::schema()) {
+            bail!("response does not contain {} schema", R::resource_type());
+        }
+
+        let resource: R =
+            serde_json::from_value(serde_json::to_value(&response.resource)?)?;
+
+        Ok(StoredParts { resource, meta: response.meta.into() })
+    }
+
+    async fn result_as_resource_list<R>(
+        result: reqwest::Response,
+    ) -> anyhow::Result<Vec<R>>
+    where
+        R: Resource + DeserializeOwned + Serialize,
+    {
+        let response: ListResponse = result.json().await?;
+
+        let resources: Vec<R> =
+            serde_json::from_value(serde_json::to_value(&response.resources)?)?;
+
+        if response.total_results != response.resources.len() {
+            // TODO: totalResults may be larger than the returned resources when
+            // returning a single page of results
+            bail!(
+                "total results {} does not match resources list length {}",
+                response.total_results,
+                response.resources.len()
+            );
+        }
+
+        Ok(resources)
+    }
+
+    async fn create_user(
+        ctx: &ServerCtx,
+        user_name: &str,
+        external_id: &str,
+    ) -> anyhow::Result<Response> {
+        let body = json!({
+            "userName": user_name,
+            "externalId": external_id,
+        });
+
+        Ok(ctx
+            .client
+            .post(format!("{}/Users", ctx.base_url))
+            .json(&body)
+            .send()
+            .await?)
+    }
+
+    async fn create_jim_user(
+        ctx: &ServerCtx,
+    ) -> anyhow::Result<(User, StoredMeta)> {
+        let user_name = "jhalpert";
+        let external_id = "jhalpert@dundermifflin.com";
+        let result = create_user(ctx, user_name, external_id).await?;
+
+        // User is created
+        assert_eq!(result.status(), StatusCode::CREATED);
+
+        let StoredParts::<User> { resource: user, meta } =
+            result_as_resource(result).await?;
+        assert_eq!(user.name, user_name);
+        assert_eq!(user.external_id, Some(external_id.to_string()));
+
+        Ok((user, meta))
+    }
+
+    async fn create_dwight_user(
+        ctx: &ServerCtx,
+    ) -> anyhow::Result<(User, StoredMeta)> {
+        let user_name = "dschrute";
+        let external_id = "dschrute@dundermifflin.com";
+        let result = create_user(ctx, user_name, external_id).await?;
+
+        // User is created
+        assert_eq!(result.status(), StatusCode::CREATED);
+
+        let StoredParts::<User> { resource: user, meta } =
+            result_as_resource(result).await?;
+        assert_eq!(user.name, user_name);
+        assert_eq!(user.external_id, Some(external_id.to_string()));
+
+        Ok((user, meta))
+    }
+
+    #[tokio::test]
+    async fn test_create_user() {
+        let ctx = setup().await.unwrap();
+        let (jim, _meta) = create_jim_user(&ctx).await.unwrap();
+
+        let conflict_result = create_user(
+            &ctx,
+            &jim.name,
+            &jim.external_id.expect("jim has an externalId"),
+        )
+        .await
+        .unwrap();
+
+        // Creating the same user again should result in a conflict
+        assert_eq!(conflict_result.status(), StatusCode::CONFLICT);
+        let error: crate::Error = conflict_result.json().await.unwrap();
+        assert_eq!(error.error_type.unwrap(), crate::ErrorType::Uniqueness)
+    }
+
+    #[tokio::test]
+    async fn test_list_users() {
+        let ctx = setup().await.unwrap();
+        let (jim, _meta) = create_jim_user(&ctx).await.unwrap();
+        let (dwight, _meta) = create_dwight_user(&ctx).await.unwrap();
+        let result = ctx
+            .client
+            .get(format!("{}/Users", ctx.base_url))
+            .send()
+            .await
+            .unwrap();
+
+        assert_eq!(result.status(), StatusCode::OK);
+        let users: Vec<User> = result_as_resource_list(result).await.unwrap();
+
+        assert!(users.contains(&jim));
+        assert!(users.contains(&dwight));
+
+        // Now test filtering for a specific user
+
+        let mut url: Url = format!("{}/Users", ctx.base_url).parse().unwrap();
+        url.set_query(Some(&format!("filter=username eq \"{}\"", jim.name)));
+
+        let filtered_result = ctx.client.get(url).send().await.unwrap();
+        assert_eq!(filtered_result.status(), StatusCode::OK);
+        let filtered_users: Vec<User> =
+            result_as_resource_list(filtered_result).await.unwrap();
+
+        assert_eq!(filtered_users.len(), 1);
+        assert!(filtered_users.contains(&jim));
+    }
+
+    #[tokio::test]
+    async fn test_replace_user() {
+        let ctx = setup().await.unwrap();
+        let (jim, jim_meta) = create_jim_user(&ctx).await.unwrap();
+        let _dwight_parts = create_dwight_user(&ctx).await.unwrap();
+
+        // Test replacing a user and changing the external id, aka: "You
+        // seriously never noticed? Hats off to you!"
+
+        let body = json!({
+            "userName": "jhalpert",
+            "externalId": "rpark@dundermifflin.com",
+        });
+        let result = ctx
+            .client
+            .put(format!("{}/Users/{}", ctx.base_url, jim.id))
+            .json(&body)
+            .send()
+            .await
+            .unwrap();
+
+        assert_eq!(result.status(), StatusCode::OK);
+        let replaced_user: User =
+            result_as_resource(result).await.unwrap().resource;
+
+        assert_ne!(&jim, &replaced_user);
+
+        // The new user should be returned by the GET now.
+
+        let result = ctx
+            .client
+            .get(format!("{}/Users/{}", ctx.base_url, jim.id))
+            .send()
+            .await
+            .unwrap();
+
+        let check: StoredParts<User> =
+            result_as_resource(result).await.unwrap();
+        assert_eq!(&replaced_user, &check.resource);
+
+        // Assert the modification time changed
+
+        assert_ne!(check.meta.last_modified, jim_meta.last_modified);
+
+        // Test that replacing a user and using a duplicate username is not
+        // allowed, aka: "Identity theft is no joke Jim!"
+
+        let body = json!({
+            "userName": "dschrute",
+            "externalId": replaced_user.external_id,
+        });
+
+        let result = ctx
+            .client
+            .put(format!("{}/Users/{}", ctx.base_url, jim.id))
+            .json(&body)
+            .send()
+            .await
+            .unwrap();
+
+        assert_eq!(result.status(), StatusCode::CONFLICT);
+        let error: crate::Error = result.json().await.unwrap();
+        assert_eq!(error.error_type.unwrap(), crate::ErrorType::Uniqueness);
+
+        // Leave out active and external id, and validate they do change
+
+        let body = json!({
+            "userName": "jhalpert",
+        });
+
+        let result = ctx
+            .client
+            .put(format!("{}/Users/{}", ctx.base_url, jim.id))
+            .json(&body)
+            .send()
+            .await
+            .unwrap();
+
+        assert_eq!(result.status(), StatusCode::OK);
+        let check_user: User =
+            result_as_resource(result).await.unwrap().resource;
+        assert!(check_user.active.is_none());
+        assert!(check_user.external_id.is_none());
+    }
+
+    #[tokio::test]
+    async fn test_patch_user() {
+        let ctx = setup().await.unwrap();
+        let (jim, _) = create_jim_user(&ctx).await.unwrap();
+
+        // Verify we are starting with no value
+
+        assert!(jim.active.is_none());
+
+        // Set the users active field to true
+        let body = json!(
+            {
+              "schemas": [
+                "urn:ietf:params:scim:api:messages:2.0:PatchOp"
+              ],
+              "Operations": [
+                {
+                  "op": "replace",
+                  "value": {
+                    "active": true
+                  }
+                }
+              ]
+            }
+        );
+
+        let result = ctx
+            .client
+            .patch(format!("{}/Users/{}", ctx.base_url, &jim.id))
+            .json(&body)
+            .send()
+            .await
+            .unwrap();
+        assert_eq!(result.status(), StatusCode::OK);
+        let user: User = result_as_resource(result).await.unwrap().resource;
+        assert_eq!(user.active, Some(true));
+
+        // Get the stored user and make sure it matches the returned user
+
+        let result = ctx
+            .client
+            .get(format!("{}/Users/{}", ctx.base_url, &jim.id))
+            .json(&body)
+            .send()
+            .await
+            .unwrap();
+        let patched_jim: User =
+            result_as_resource(result).await.unwrap().resource;
+        assert_eq!(patched_jim, user);
+    }
+}
