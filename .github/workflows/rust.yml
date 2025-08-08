@@ -45,3 +45,24 @@ jobs:
       run: cargo clippy -- --version
     - name: Run Clippy Lints
       run: cargo clippy --all-targets --workspace -- --deny warnings 
+
+  build:
+    name: Build and test
+    runs-on: ubuntu-24.04
+    steps:
+    # This repo is unstable and unnecessary: https://github.com/microsoft/linux-package-repositories/issues/34
+    - name: Disable packages.microsoft.com repo
+      run: sudo rm -f /etc/apt/sources.list.d/microsoft-prod.list
+    - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+      with:
+        ref: ${{ github.event.pull_request.head.sha }} # see omicron#4461
+    - uses: Swatinem/rust-cache@98c8021b550208e191a6a3145459bfc9fb29c4c0 # v2.8.0
+      if: ${{ github.ref != 'refs/heads/main' }}
+    - name: Install latest nextest release
+      uses: taiki-e/install-action@nextest
+    - name: Test with latest nextest release
+      uses: actions-rs/cargo@v1
+      with:
+        command: nextest
+        args: run --all-features --profile ci
+      
