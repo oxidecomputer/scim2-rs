@@ -12,7 +12,7 @@ on:
 
 jobs:
   check-style:
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     steps:
     - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
       with:
@@ -27,7 +27,7 @@ jobs:
   # Note that `cargo clippy` includes `cargo check, so this ends up checking all
   # of our (default) code.
   clippy-lint:
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     env:
       CARGO_INCREMENTAL: 0
     steps:
