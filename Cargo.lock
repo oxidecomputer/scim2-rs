@@ -1547,10 +1547,13 @@ dependencies = [
  "chrono",
  "dropshot",
  "http",
+ "reqwest",
  "schemars",
+ "scim2-test-provider-server",
  "serde",
  "serde_json",
  "slog",
+ "tokio",
  "uuid 1.18.0",
 ]
 
