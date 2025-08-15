@@ -23,4 +23,4 @@ slog-term = { version = "2.9" }
 tokio = { version = "1.46", features = [ "full" ] }
 uuid = { version = "1.18.0", features = ["serde", "v4"] }
 chrono = "0.4.41"
-reqwest = { version = "0.12.22", features = ["blocking", "json"] }
+reqwest = { version = "0.12.23", features = ["blocking", "json"] }
