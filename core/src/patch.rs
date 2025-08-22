@@ -1,5 +1,7 @@
+use iddqd::IdOrdMap;
 use schemars::JsonSchema;
 use serde::Deserialize;
+use unicase::UniCase;
 
 use crate::Group;
 use crate::GroupMember;
@@ -177,10 +179,12 @@ fn apply_group_add_op(
             )));
         }
 
-        group.resource.members.get_or_insert_default().push(GroupMember {
-            resource_type: Some(ResourceType::User.to_string()),
-            value: Some(member.value),
-        });
+        group.resource.members.get_or_insert_default().insert_overwrite(
+            GroupMember {
+                resource_type: Some(ResourceType::User.to_string()),
+                value: Some(member.value),
+            },
+        );
     }
 
     Ok(())
@@ -223,19 +227,10 @@ fn apply_group_remove_op(
     group: &mut StoredParts<Group>,
 ) -> Result<(), PatchRequestError> {
     match parse_remove_path(path)? {
-        GroupRemoveOp::All => group.resource.members = Some(Vec::new()),
+        GroupRemoveOp::All => group.resource.members = Some(IdOrdMap::new()),
         GroupRemoveOp::Indvidual(value) => {
             let groups = group.resource.members.get_or_insert_default();
-
-            if let Some(idx) = groups.iter().position(|m| {
-                if let Some(mvalue) = &m.value {
-                    mvalue.eq_ignore_ascii_case(&value)
-                } else {
-                    false
-                }
-            }) {
-                groups.swap_remove(idx);
-            }
+            groups.remove(&Some(UniCase::new(value.as_str())));
         }
     };
 

@@ -12,10 +12,10 @@ use serde::Serialize;
 use serde::de::DeserializeOwned;
 use serde_json::json;
 use std::str::FromStr;
+use unicase::UniCase;
 use uuid::Uuid;
 
 use scim2_rs::Group;
-use scim2_rs::GroupMember;
 use scim2_rs::ListResponse;
 use scim2_rs::Resource;
 use scim2_rs::ResourceType;
@@ -850,13 +850,7 @@ impl Tester {
 
         // Make sure we are starting with an empty group member list
 
-        if !stored_group
-            .resource
-            .members
-            .as_deref()
-            .unwrap_or_default()
-            .is_empty()
-        {
+        if stored_group.resource.members.is_some() {
             bail!(
                 "group members should be empty but found: {:?}",
                 stored_group.resource.members
@@ -895,16 +889,9 @@ impl Tester {
         let patched_group: StoredParts<Group> =
             self.result_as_resource(result)?;
 
-        if !patched_group
-            .resource
-            .members
-            .as_deref()
-            .unwrap_or_default()
-            .contains(&GroupMember {
-                resource_type: Some(ResourceType::User.to_string()),
-                value: Some(jim.id.clone()),
-            })
-        {
+        if !patched_group.resource.members.as_ref().is_some_and(|m| {
+            m.contains_key(&Some(UniCase::new(jim.id.as_str())))
+        }) {
             bail!(
                 "group members should contain {} but found {:?}",
                 jim.id,
@@ -912,16 +899,9 @@ impl Tester {
             );
         }
 
-        if !patched_group
-            .resource
-            .members
-            .as_deref()
-            .unwrap_or_default()
-            .contains(&GroupMember {
-                resource_type: Some(ResourceType::User.to_string()),
-                value: Some(dwight.id.clone()),
-            })
-        {
+        if !patched_group.resource.members.as_ref().is_some_and(|m| {
+            m.contains_key(&Some(UniCase::new(dwight.id.as_str())))
+        }) {
             bail!(
                 "group members should contain {} but found {:?}",
                 dwight.id,
@@ -952,16 +932,9 @@ impl Tester {
         let patched_group: StoredParts<Group> =
             self.result_as_resource(result)?;
 
-        if patched_group
-            .resource
-            .members
-            .as_deref()
-            .unwrap_or_default()
-            .contains(&GroupMember {
-                resource_type: Some(ResourceType::User.to_string()),
-                value: Some(jim.id.clone()),
-            })
-        {
+        if patched_group.resource.members.as_ref().is_some_and(|m| {
+            m.contains_key(&Some(UniCase::new(jim.id.as_str())))
+        }) {
             bail!(
                 "group members should not contain {} but found {:?}",
                 jim.id,
@@ -969,17 +942,11 @@ impl Tester {
             );
         }
 
-        if patched_group.resource.members.as_deref().unwrap_or_default().len()
-            != 1
+        if patched_group.resource.members.as_ref().is_some_and(|m| m.len() != 1)
         {
             bail!(
                 "group members should only contain 1 member but found {}",
-                patched_group
-                    .resource
-                    .members
-                    .as_deref()
-                    .unwrap_or_default()
-                    .len()
+                patched_group.resource.members.unwrap_or_default().len()
             );
         }
 
@@ -1006,13 +973,7 @@ impl Tester {
         let patched_group: StoredParts<Group> =
             self.result_as_resource(result)?;
 
-        if !patched_group
-            .resource
-            .members
-            .as_deref()
-            .unwrap_or_default()
-            .is_empty()
-        {
+        if !patched_group.resource.members.unwrap_or_default().is_empty() {
             bail!(
                 "group members should be empty but found: {:?}",
                 stored_group.resource.members
@@ -1211,7 +1172,7 @@ impl Tester {
             }
 
             if let Some(check_member_resource_type_string) =
-                &check_members[0].resource_type
+                &check_members.iter().next().unwrap().resource_type
             {
                 let check_member_resource_type = match ResourceType::from_str(
                     check_member_resource_type_string,
