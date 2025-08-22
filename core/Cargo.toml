@@ -9,10 +9,12 @@ async-trait.workspace = true
 chrono.workspace = true
 dropshot.workspace = true
 http.workspace = true
+iddqd.workspace = true
 schemars.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 slog.workspace = true
+unicase.workspace = true
 uuid.workspace = true
 
 [dev-dependencies]

@@ -8,6 +8,8 @@ use chrono::Utc;
 use dropshot::Body;
 use http::Response;
 use http::StatusCode;
+use iddqd::IdOrdItem;
+use iddqd::IdOrdMap;
 use schemars::JsonSchema;
 use serde::Deserialize;
 use serde::Serialize;
@@ -36,6 +38,17 @@ pub use user::*;
 
 /// Skip serializing if optional list is None or empty
 pub fn skip_serializing_list<T>(members: &Option<Vec<T>>) -> bool {
+    match members {
+        None => true,
+        Some(v) => v.is_empty(),
+    }
+}
+
+/// Skip serializing if optional list is None or empty for IdOrdMap
+pub fn skip_serializing_list_map<T>(members: &Option<IdOrdMap<T>>) -> bool
+where
+    T: IdOrdItem,
+{
     match members {
         None => true,
         Some(v) => v.is_empty(),
