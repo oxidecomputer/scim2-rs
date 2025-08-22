@@ -19,8 +19,7 @@ pub enum PatchRequestError {
 #[serde(tag = "op")]
 pub enum PatchOp {
     #[serde(rename = "replace")]
-    // NB: replace ops have optional paths but we don't support it yet
-    Replace { value: serde_json::Value },
+    Replace { path: Option<String>, value: serde_json::Value },
     #[serde(rename = "add")]
     Add { path: Option<String>, value: serde_json::Value },
     #[serde(rename = "remove")]
@@ -58,7 +57,7 @@ impl PatchRequest {
         let mut updated_user = stored_user.clone();
 
         for patch_op in &self.operations {
-            let PatchOp::Replace { value } = patch_op else {
+            let PatchOp::Replace { path: _, value } = patch_op else {
                 return Err(PatchRequestError::Unsupported(
                     "only the replace op is supported for users".to_string(),
                 ));
@@ -94,9 +93,11 @@ impl PatchRequest {
 
         for patch_op in &self.operations {
             match patch_op {
-                PatchOp::Replace { value } => {
-                    apply_group_replace_op(value, &mut updated_group)?
-                }
+                PatchOp::Replace { path, value } => apply_group_replace_op(
+                    path.as_ref(),
+                    value,
+                    &mut updated_group,
+                )?,
                 PatchOp::Add { path, value } => apply_group_add_op(
                     path.as_deref(),
                     value,
@@ -113,31 +114,80 @@ impl PatchRequest {
 }
 
 fn apply_group_replace_op(
+    path: Option<&String>,
     value: &serde_json::Value,
     group: &mut StoredParts<Group>,
 ) -> Result<(), PatchRequestError> {
-    #[derive(Debug, Deserialize)]
-    #[serde(rename_all = "camelCase")]
-    struct DisplayName {
-        id: String,
-        display_name: String,
+    match path {
+        // Validate that we are replacing a groups members
+        Some(path) => {
+            #[derive(Debug, Deserialize)]
+            #[serde(rename_all = "camelCase")]
+            struct Member {
+                value: String,
+            }
+
+            if !path.eq_ignore_ascii_case("members") {
+                return Err(PatchRequestError::Unsupported(
+                    "only replacing a groups members path is supported"
+                        .to_string(),
+                ));
+            }
+
+            let Ok(patch_members) =
+                serde_json::from_value::<Vec<Member>>(value.clone())
+            else {
+                return Err(PatchRequestError::Invalid(
+                    "members being replaced in a group require a value field"
+                        .to_string(),
+                ));
+            };
+
+            let new_members: IdOrdMap<GroupMember> = patch_members
+                .into_iter()
+                .map(|member| GroupMember {
+                    resource_type: Some(ResourceType::User.to_string()),
+                    value: Some(member.value),
+                })
+                .collect();
+            group.resource.members =
+                (!new_members.is_empty()).then_some(new_members);
+        }
+
+        // RFC 7664 § 3.5.2.3:
+        //
+        // If the "path" parameter is omitted, the target is assumed to be the
+        // resource itself. In this case, the "value" attribute SHALL contain a
+        // list of one or more attributes that are to be replaced.
+        None => {
+            #[derive(Debug, Deserialize)]
+            #[serde(rename_all = "camelCase")]
+            struct DisplayName {
+                id: String,
+                display_name: String,
+            }
+
+            // We currently only support changing a display name
+            let Ok(change) =
+                serde_json::from_value::<DisplayName>(value.clone())
+            else {
+                return Err(PatchRequestError::Unsupported(
+                    "only replacing a displayName is supported when not
+                     including a path"
+                        .to_string(),
+                ));
+            };
+
+            if !group.resource.id.eq_ignore_ascii_case(&change.id) {
+                return Err(PatchRequestError::Invalid(format!(
+                    "unexpected group id {}",
+                    change.id
+                )));
+            }
+
+            group.resource.display_name = change.display_name;
+        }
     }
-
-    let Ok(change) = serde_json::from_value::<DisplayName>(value.clone())
-    else {
-        return Err(PatchRequestError::Unsupported(
-            "only replacing a groups displayName is supported".to_string(),
-        ));
-    };
-
-    if !group.resource.id.eq_ignore_ascii_case(&change.id) {
-        return Err(PatchRequestError::Invalid(format!(
-            "unexpected group id {}",
-            change.id
-        )));
-    }
-
-    group.resource.display_name = change.display_name;
 
     Ok(())
 }
@@ -278,6 +328,29 @@ mod test {
                 "id": "abf4dd94-a4c0-4f67-89c9-76b03340cb9b",
                 "displayName": "Test SCIMv2"
               }
+            }
+          ]
+        });
+
+        serde_json::from_value::<PatchRequest>(json).unwrap();
+    }
+
+    #[test]
+    fn test_parse_group_members_replace_op() {
+        let json = json!({
+          "schemas": [
+            "urn:ietf:params:scim:api:messages:2.0:PatchOp"
+          ],
+          "Operations": [
+            {
+              "op": "replace",
+              "path": "members",
+              "value": [
+                {
+                  "value": "abf4dd94-a4c0-4f67-89c9-76b03340cb9b",
+                  "display": "dakota@example.com"
+                }
+              ]
             }
           ]
         });

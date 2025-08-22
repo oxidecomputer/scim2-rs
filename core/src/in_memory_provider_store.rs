@@ -1347,12 +1347,12 @@ mod test {
             .await
             .unwrap();
 
-        let patched_group2: StoredParts<Group> =
+        let patched_group5: StoredParts<Group> =
             result_as_resource(result).await.unwrap();
-        group_is_durably_stored(&ctx, &patched_group2.resource).await;
+        group_is_durably_stored(&ctx, &patched_group5.resource).await;
 
         let members =
-            patched_group2.resource.members.expect("group has members");
+            patched_group5.resource.members.expect("group has members");
         assert_eq!(members.len(), 1);
         let membership_ids: Vec<_> = members
             .into_iter()
@@ -1363,6 +1363,59 @@ mod test {
         assert!(
             membership_ids
                 .contains(&(jim.id.clone(), ResourceType::User.to_string()))
+        );
+
+        // Replace group members via replace op
+
+        let body = json!({
+          "schemas": [
+            "urn:ietf:params:scim:api:messages:2.0:PatchOp"
+          ],
+          "Operations": [
+            {
+              "op": "replace",
+              "path": "members",
+              "value": [
+                {
+                  "value": dwight.id,
+                  "display": dwight.name
+                },
+                {
+                  "value": dwight.id,
+                  "display": dwight.name
+                },
+              ]
+            }
+          ]
+        });
+
+        let result = ctx
+            .client
+            .patch(format!(
+                "{}/Groups/{}",
+                ctx.base_url, patched_group.resource.id
+            ))
+            .json(&body)
+            .send()
+            .await
+            .unwrap();
+
+        let patched_group6: StoredParts<Group> =
+            result_as_resource(result).await.unwrap();
+        group_is_durably_stored(&ctx, &patched_group6.resource).await;
+
+        let members =
+            patched_group6.resource.members.expect("group has members");
+        assert_eq!(members.len(), 1);
+        let membership_ids: Vec<_> = members
+            .into_iter()
+            .map(|member| {
+                (member.value.unwrap(), member.resource_type.unwrap())
+            })
+            .collect();
+        assert!(
+            membership_ids
+                .contains(&(dwight.id.clone(), ResourceType::User.to_string()))
         );
     }
 }
