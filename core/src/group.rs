@@ -2,6 +2,9 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 
+use iddqd::{IdOrdItem, IdOrdMap, id_upcast};
+use unicase::UniCase;
+
 use super::*;
 
 #[derive(Deserialize, JsonSchema, Clone)]
@@ -12,7 +15,7 @@ pub struct CreateGroupRequest {
     /// An identifier for the resource as defined by the provisioning client
     pub external_id: Option<String>,
 
-    pub members: Option<Vec<GroupMember>>,
+    pub members: Option<IdOrdMap<GroupMember>>,
 }
 
 #[derive(Serialize, Deserialize, JsonSchema, Clone, Debug, PartialEq)]
@@ -27,8 +30,8 @@ pub struct Group {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub external_id: Option<String>,
 
-    #[serde(skip_serializing_if = "skip_serializing_list::<GroupMember>")]
-    pub members: Option<Vec<GroupMember>>,
+    #[serde(skip_serializing_if = "skip_serializing_list_map::<GroupMember>")]
+    pub members: Option<IdOrdMap<GroupMember>>,
 }
 
 impl Resource for Group {
@@ -45,7 +48,9 @@ impl Resource for Group {
     }
 }
 
-#[derive(Serialize, Deserialize, JsonSchema, Clone, Debug, PartialEq)]
+#[derive(
+    Serialize, Deserialize, JsonSchema, Clone, Debug, PartialEq, Default,
+)]
 pub struct GroupMember {
     /// User or Group
     #[serde(rename = "type")]
@@ -53,4 +58,16 @@ pub struct GroupMember {
 
     /// identifier of the member of this group
     pub value: Option<String>,
+}
+
+impl IdOrdItem for GroupMember {
+    // This is currently mapped to _just_ the value as we are not supporting
+    // nested groups.
+    type Key<'a> = Option<UniCase<&'a str>>;
+
+    fn key(&self) -> Self::Key<'_> {
+        self.value.as_deref().map(UniCase::new)
+    }
+
+    id_upcast!();
 }
