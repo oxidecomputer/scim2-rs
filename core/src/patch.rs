@@ -153,7 +153,12 @@ fn apply_group_replace_op(
             group.resource.members =
                 (!new_members.is_empty()).then_some(new_members);
         }
-        // Treat this as a display name change
+
+        // RFC 7664 § 3.5.2.3:
+        //
+        // If the "path" parameter is omitted, the target is assumed to be the
+        // resource itself. In this case, the "value" attribute SHALL contain a
+        // list of one or more attributes that are to be replaced.
         None => {
             #[derive(Debug, Deserialize)]
             #[serde(rename_all = "camelCase")]
@@ -162,11 +167,14 @@ fn apply_group_replace_op(
                 display_name: String,
             }
 
+            // We currently only support changing a display name
             let Ok(change) =
                 serde_json::from_value::<DisplayName>(value.clone())
             else {
-                return Err(PatchRequestError::Invalid(
-                    "missing new value for replacing displayName".to_string(),
+                return Err(PatchRequestError::Unsupported(
+                    "only replacing a displayName is supported when not
+                     including a path"
+                        .to_string(),
                 ));
             };
 
