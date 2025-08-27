@@ -2,7 +2,11 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 
-use super::*;
+use chrono::{DateTime, Utc};
+use schemars::JsonSchema;
+use serde::{Deserialize, Serialize};
+
+use crate::Resource;
 
 #[derive(Deserialize, Serialize, JsonSchema, Clone, Debug)]
 #[serde(rename_all = "camelCase")]

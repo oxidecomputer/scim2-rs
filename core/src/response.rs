@@ -2,14 +2,17 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 
-use http::header;
+use dropshot::Body;
+use http::{Response, StatusCode, header};
 use schemars::{
-    SchemaGenerator,
+    JsonSchema, SchemaGenerator,
     schema::{InstanceType, Schema, SchemaObject},
 };
-use serde::Deserializer;
+use serde::{Deserialize, Deserializer, Serialize};
 
-use super::*;
+use crate::{
+    Meta, PatchRequestError, QueryParams, Resource, StoredMeta, StoredParts,
+};
 
 const CONTENT_TYPE_SCIM_JSON: &str = "application/scim+json";
 

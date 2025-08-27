@@ -2,16 +2,13 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 
-use async_trait::async_trait;
-use chrono::DateTime;
-use chrono::Utc;
-use dropshot::Body;
-use http::Response;
-use http::StatusCode;
+//! This crate implements a subset of System for Cross-domain Identity
+//! Management version 2.0 (SCIM) or RFC 7643 (schema) and RFC 7644 (protocol).
+//! At the moment it is known to work specifically with Okta serving as an IdP.
+
 use iddqd::IdOrdItem;
 use iddqd::IdOrdMap;
 use schemars::JsonSchema;
-use serde::Deserialize;
 use serde::Serialize;
 
 mod group;
@@ -25,16 +22,20 @@ mod resource;
 mod response;
 mod user;
 
-pub use group::*;
-pub use in_memory_provider_store::*;
-pub use meta::*;
-pub use patch::*;
-pub use provider::*;
-pub use provider_store::*;
-pub use query_params::*;
-pub use resource::*;
-pub use response::*;
-pub use user::*;
+pub use group::{CreateGroupRequest, Group, GroupMember};
+pub use in_memory_provider_store::{
+    InMemoryProviderStore, InMemoryProviderStoreState,
+};
+pub use meta::{Meta, StoredMeta, StoredParts};
+pub use patch::{PatchRequest, PatchRequestError};
+pub use provider::Provider;
+pub use provider_store::{
+    ProviderStore, ProviderStoreDeleteResult, ProviderStoreError,
+};
+pub use query_params::{FilterOp, QueryParams};
+pub use resource::Resource;
+pub use response::{Error, ErrorType, ListResponse, SingleResourceResponse};
+pub use user::{CreateUserRequest, User, UserGroup, UserGroupType};
 
 /// Skip serializing if optional list is None or empty
 pub fn skip_serializing_list<T>(members: &Option<Vec<T>>) -> bool {

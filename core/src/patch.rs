@@ -1,3 +1,7 @@
+// This Source Code Form is subject to the terms of the Mozilla Public
+// License, v. 2.0. If a copy of the MPL was not distributed with this
+// file, You can obtain one at https://mozilla.org/MPL/2.0/.
+
 use iddqd::IdOrdMap;
 use schemars::JsonSchema;
 use serde::Deserialize;
@@ -17,7 +21,7 @@ pub enum PatchRequestError {
 
 #[derive(Debug, Deserialize, JsonSchema, Clone)]
 #[serde(tag = "op")]
-pub enum PatchOp {
+enum PatchOp {
     #[serde(rename = "replace")]
     Replace { path: Option<String>, value: serde_json::Value },
     #[serde(rename = "add")]

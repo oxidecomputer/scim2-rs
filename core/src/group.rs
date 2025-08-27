@@ -3,9 +3,11 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 
 use iddqd::{IdOrdItem, IdOrdMap, id_upcast};
+use schemars::JsonSchema;
+use serde::{Deserialize, Serialize};
 use unicase::UniCase;
 
-use super::*;
+use crate::{Resource, skip_serializing_list_map};
 
 #[derive(Deserialize, JsonSchema, Clone)]
 #[serde(rename_all = "camelCase")]
