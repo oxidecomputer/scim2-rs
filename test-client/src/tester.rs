@@ -27,6 +27,7 @@ use scim2_rs::User;
 pub struct Tester {
     url: String,
     client: Client,
+    headers: header::HeaderMap,
 }
 
 impl Tester {
@@ -36,17 +37,89 @@ impl Tester {
     ) -> anyhow::Result<Self> {
         let mut headers = header::HeaderMap::new();
         headers.insert(
+            header::CONTENT_TYPE,
+            header::HeaderValue::from_str(
+                "application/scim+json; charset=utf-8",
+            )?,
+        );
+        headers.insert(
+            header::ACCEPT,
+            header::HeaderValue::from_str("application/scim+json")?,
+        );
+        headers.insert(
             header::AUTHORIZATION,
             header::HeaderValue::from_str(&format!("Bearer {bearer}"))?,
         );
 
-        let client = Client::builder().default_headers(headers).build()?;
+        let client =
+            Client::builder().default_headers(headers.clone()).build()?;
 
-        Ok(Self { url, client })
+        Ok(Self { url, client, headers })
     }
 
-    pub fn new(url: String) -> Self {
-        Self { url, client: Client::new() }
+    pub fn new(url: String) -> anyhow::Result<Self> {
+        let mut headers = header::HeaderMap::new();
+        headers.insert(
+            header::CONTENT_TYPE,
+            header::HeaderValue::from_str(
+                "application/scim+json; charset=utf-8",
+            )?,
+        );
+        headers.insert(
+            header::ACCEPT,
+            header::HeaderValue::from_str("application/scim+json")?,
+        );
+
+        let client =
+            Client::builder().default_headers(headers.clone()).build()?;
+        Ok(Self { url, client, headers })
+    }
+
+    fn get(
+        &self,
+        url: impl reqwest::IntoUrl,
+    ) -> Result<reqwest::blocking::Response, reqwest::Error> {
+        self.client.get(url).headers(self.headers.clone()).send()
+    }
+
+    fn post<T>(
+        &self,
+        url: impl reqwest::IntoUrl,
+        body: &T,
+    ) -> Result<reqwest::blocking::Response, reqwest::Error>
+    where
+        T: Serialize,
+    {
+        self.client.post(url).json(body).headers(self.headers.clone()).send()
+    }
+
+    fn put<T>(
+        &self,
+        url: impl reqwest::IntoUrl,
+        body: &T,
+    ) -> Result<reqwest::blocking::Response, reqwest::Error>
+    where
+        T: Serialize,
+    {
+        self.client.put(url).json(body).headers(self.headers.clone()).send()
+    }
+
+    fn patch<T>(
+        &self,
+        url: impl reqwest::IntoUrl,
+        body: &T,
+    ) -> Result<reqwest::blocking::Response, reqwest::Error>
+    where
+        T: Serialize,
+    {
+        self.client.patch(url).json(body).headers(self.headers.clone()).send()
+    }
+
+    fn delete(
+        &self,
+        url: impl reqwest::IntoUrl,
+    ) -> Result<reqwest::blocking::Response, reqwest::Error> {
+        self.client.delete(url).headers(self.headers.clone()).send()
     }
 
     pub fn run(&self) -> anyhow::Result<()> {
@@ -131,10 +204,7 @@ impl Tester {
         let random_id = Uuid::new_v4().to_string();
 
         // A GET of non-existent user = 404
-        let result = self
-            .client
-            .get(format!("{}/Users/{}", self.url, random_id))
-            .send()?;
+        let result = self.get(format!("{}/Users/{}", self.url, random_id))?;
 
         if result.status() != StatusCode::NOT_FOUND {
             bail!(
@@ -149,11 +219,8 @@ impl Tester {
             "userName": "notblank",
         });
 
-        let result = self
-            .client
-            .put(format!("{}/Users/{}", self.url, random_id))
-            .json(&body)
-            .send()?;
+        let result =
+            self.put(format!("{}/Users/{}", self.url, random_id), &body)?;
 
         if result.status() != StatusCode::NOT_FOUND {
             bail!(
@@ -164,10 +231,8 @@ impl Tester {
         }
 
         // DELETE of non-existent user = 404
-        let result = self
-            .client
-            .delete(format!("{}/Users/{}", self.url, random_id))
-            .send()?;
+        let result =
+            self.delete(format!("{}/Users/{}", self.url, random_id))?;
 
         if result.status() != StatusCode::NOT_FOUND {
             bail!(
@@ -178,10 +243,7 @@ impl Tester {
         }
 
         // A GET of non-existent group = 404
-        let result = self
-            .client
-            .get(format!("{}/Groups/{}", self.url, random_id))
-            .send()?;
+        let result = self.get(format!("{}/Groups/{}", self.url, random_id))?;
 
         if result.status() != StatusCode::NOT_FOUND {
             bail!(
@@ -196,11 +258,8 @@ impl Tester {
             "displayName": "notblank",
         });
 
-        let result = self
-            .client
-            .put(format!("{}/Groups/{}", self.url, random_id))
-            .json(&body)
-            .send()?;
+        let result =
+            self.put(format!("{}/Groups/{}", self.url, random_id), &body)?;
 
         if result.status() != StatusCode::NOT_FOUND {
             bail!(
@@ -211,10 +270,8 @@ impl Tester {
         }
 
         // DELETE of non-existent group = 404
-        let result = self
-            .client
-            .delete(format!("{}/Groups/{}", self.url, random_id))
-            .send()?;
+        let result =
+            self.delete(format!("{}/Groups/{}", self.url, random_id))?;
 
         if result.status() != StatusCode::NOT_FOUND {
             bail!(
@@ -233,11 +290,7 @@ impl Tester {
             "externalId": "dschrute@dundermifflin.com",
         });
 
-        let result = self
-            .client
-            .post(format!("{}/Users", self.url))
-            .json(&body)
-            .send()?;
+        let result = self.post(format!("{}/Users", self.url), &body)?;
 
         // RFC 7664 § 3.3:
         // When the service provider successfully creates the new resource, an
@@ -270,11 +323,8 @@ impl Tester {
         // status code 409 (Conflict) with a "scimType" error code of
         // "uniqueness", as per Section 3.12.
 
-        let conflict_result = self
-            .client
-            .post(format!("{}/Users", self.url))
-            .json(&body)
-            .send()?;
+        let conflict_result =
+            self.post(format!("{}/Users", self.url), &body)?;
 
         if conflict_result.status() != StatusCode::CONFLICT {
             bail!(
@@ -315,11 +365,7 @@ impl Tester {
             "externalId": "jhalpert@dundermifflin.com",
         });
 
-        let result = self
-            .client
-            .post(format!("{}/Users", self.url))
-            .json(&body)
-            .send()?;
+        let result = self.post(format!("{}/Users", self.url), &body)?;
 
         let user: User = self.result_as_resource(result)?.resource;
 
@@ -327,7 +373,7 @@ impl Tester {
     }
 
     fn list_users_test(&self, dwight: &User, jim: &User) -> anyhow::Result<()> {
-        let result = self.client.get(format!("{}/Users", self.url)).send()?;
+        let result = self.get(format!("{}/Users", self.url))?;
 
         if result.status() != StatusCode::OK {
             bail!("listing users returned {}", result.status());
@@ -354,7 +400,7 @@ impl Tester {
         let mut url: Url = format!("{}/Users", self.url).parse().unwrap();
         url.set_query(Some(&format!("filter=username eq \"{}\"", jim.name)));
 
-        let result = self.client.get(url).send()?;
+        let result = self.get(url)?;
 
         if result.status() != StatusCode::OK {
             bail!("listing users returned {}", result.status());
@@ -394,7 +440,7 @@ impl Tester {
             }
         );
 
-        let result = self.client.patch(url.clone()).json(&body).send()?;
+        let result = self.patch(url.clone(), &body)?;
 
         // RFC 7664 § 3.5.2:
         // On successful completion, the server either MUST return a 200 OK
@@ -434,7 +480,7 @@ impl Tester {
             }
         );
 
-        let result = self.client.patch(url).json(&body).send()?;
+        let result = self.patch(url, &body)?;
         let jim: StoredParts<User> = self.result_as_resource(result)?;
 
         if jim.resource.active != Some(true) {
@@ -450,10 +496,7 @@ impl Tester {
         // Store Jim's meta for later comparison
 
         let jim_meta: StoredMeta = {
-            let result = self
-                .client
-                .get(format!("{}/Users/{}", self.url, jim.id))
-                .send()?;
+            let result = self.get(format!("{}/Users/{}", self.url, jim.id))?;
 
             let parts: StoredParts<User> = self.result_as_resource(result)?;
 
@@ -468,11 +511,8 @@ impl Tester {
             "externalId": "rpark@dundermifflin.com",
         });
 
-        let result = self
-            .client
-            .put(format!("{}/Users/{}", self.url, jim.id))
-            .json(&body)
-            .send()?;
+        let result =
+            self.put(format!("{}/Users/{}", self.url, jim.id), &body)?;
 
         // RFC 7664 § 3.5.1:
         // Unless otherwise specified, a successful PUT operation returns a 200
@@ -496,8 +536,7 @@ impl Tester {
 
         // The new user should be returned by the GET now.
 
-        let result =
-            self.client.get(format!("{}/Users/{}", self.url, jim.id)).send()?;
+        let result = self.get(format!("{}/Users/{}", self.url, jim.id))?;
 
         let check: StoredParts<User> = self.result_as_resource(result)?;
 
@@ -513,11 +552,8 @@ impl Tester {
 
         // Revert the change.
 
-        let result = self
-            .client
-            .put(format!("{}/Users/{}", self.url, jim.id))
-            .json(&jim)
-            .send()?;
+        let result =
+            self.put(format!("{}/Users/{}", self.url, jim.id), &jim)?;
 
         if result.status() != StatusCode::OK {
             bail!(
@@ -541,11 +577,8 @@ impl Tester {
             "externalId": "jhalpert@dundermifflin.com",
         });
 
-        let result = self
-            .client
-            .put(format!("{}/Users/{}", self.url, jim.id))
-            .json(&body)
-            .send()?;
+        let result =
+            self.put(format!("{}/Users/{}", self.url, jim.id), &body)?;
 
         let error: scim2_rs::Error = result.json()?;
 
@@ -575,11 +608,8 @@ impl Tester {
             "userName": "jhalpert",
         });
 
-        let result = self
-            .client
-            .put(format!("{}/Users/{}", self.url, jim.id))
-            .json(&body)
-            .send()?;
+        let result =
+            self.put(format!("{}/Users/{}", self.url, jim.id), &body)?;
 
         if result.status() != StatusCode::OK {
             bail!(
@@ -614,11 +644,7 @@ impl Tester {
             "members": [],
         });
 
-        let result = self
-            .client
-            .post(format!("{}/Groups", self.url))
-            .json(&body)
-            .send()?;
+        let result = self.post(format!("{}/Groups", self.url), &body)?;
 
         // RFC 7664 § 3.3:
         // When the service provider successfully creates the new resource, an
@@ -652,11 +678,8 @@ impl Tester {
         // name) where uniqueness is required in the POST request, but the
         // in-memory provider store does not allow for duplicate groups.
 
-        let conflict_result = self
-            .client
-            .post(format!("{}/Groups", self.url))
-            .json(&body)
-            .send()?;
+        let conflict_result =
+            self.post(format!("{}/Groups", self.url), &body)?;
 
         if conflict_result.status() != StatusCode::CONFLICT {
             bail!(
@@ -673,10 +696,8 @@ impl Tester {
         // Store the group's meta for later comparison
 
         let group_meta: StoredMeta = {
-            let result = self
-                .client
-                .get(format!("{}/Groups/{}", self.url, group.id))
-                .send()?;
+            let result =
+                self.get(format!("{}/Groups/{}", self.url, group.id))?;
 
             let parts: StoredParts<Group> = self.result_as_resource(result)?;
 
@@ -690,11 +711,8 @@ impl Tester {
             "displayName": "Sales Reps",
         });
 
-        let result = self
-            .client
-            .put(format!("{}/Groups/{}", self.url, group.id))
-            .json(&body)
-            .send()?;
+        let result =
+            self.put(format!("{}/Groups/{}", self.url, group.id), &body)?;
 
         // RFC 7664 § 3.5.1:
         // Unless otherwise specified, a successful PUT operation returns a 200
@@ -723,10 +741,7 @@ impl Tester {
 
         // The new group should be returned by the GET now.
 
-        let result = self
-            .client
-            .get(format!("{}/Groups/{}", self.url, group.id))
-            .send()?;
+        let result = self.get(format!("{}/Groups/{}", self.url, group.id))?;
 
         let check: StoredParts<Group> = self.result_as_resource(result)?;
 
@@ -742,11 +757,8 @@ impl Tester {
 
         // Revert the change.
 
-        let result = self
-            .client
-            .put(format!("{}/Groups/{}", self.url, group.id))
-            .json(&group)
-            .send()?;
+        let result =
+            self.put(format!("{}/Groups/{}", self.url, group.id), &group)?;
 
         if result.status() != StatusCode::OK {
             bail!(
@@ -788,11 +800,8 @@ impl Tester {
           ]
         });
 
-        let result = self
-            .client
-            .patch(format!("{}/Groups/{}", self.url, group.id))
-            .json(&body)
-            .send()?;
+        let result =
+            self.patch(format!("{}/Groups/{}", self.url, group.id), &body)?;
         let patched_group: StoredParts<Group> =
             self.result_as_resource(result)?;
 
@@ -821,11 +830,8 @@ impl Tester {
           ]
         });
 
-        let result = self
-            .client
-            .patch(format!("{}/Groups/{}", self.url, group.id))
-            .json(&body)
-            .send()?;
+        let result =
+            self.patch(format!("{}/Groups/{}", self.url, group.id), &body)?;
         let patched_group: StoredParts<Group> =
             self.result_as_resource(result)?;
 
@@ -840,10 +846,7 @@ impl Tester {
 
         // Grab a handle to the stored group
 
-        let result = self
-            .client
-            .get(format!("{}/Groups/{}", self.url, group.id))
-            .send()?;
+        let result = self.get(format!("{}/Groups/{}", self.url, group.id))?;
 
         let stored_group: StoredParts<Group> =
             self.result_as_resource(result)?;
@@ -881,11 +884,8 @@ impl Tester {
           ]
         });
 
-        let result = self
-            .client
-            .patch(format!("{}/Groups/{}", self.url, group.id))
-            .json(&body)
-            .send()?;
+        let result =
+            self.patch(format!("{}/Groups/{}", self.url, group.id), &body)?;
         let patched_group: StoredParts<Group> =
             self.result_as_resource(result)?;
 
@@ -923,11 +923,8 @@ impl Tester {
           ]
         });
 
-        let result = self
-            .client
-            .patch(format!("{}/Groups/{}", self.url, group.id))
-            .json(&body)
-            .send()?;
+        let result =
+            self.patch(format!("{}/Groups/{}", self.url, group.id), &body)?;
 
         let patched_group: StoredParts<Group> =
             self.result_as_resource(result)?;
@@ -964,11 +961,8 @@ impl Tester {
           ]
         });
 
-        let result = self
-            .client
-            .patch(format!("{}/Groups/{}", self.url, group.id))
-            .json(&body)
-            .send()?;
+        let result =
+            self.patch(format!("{}/Groups/{}", self.url, group.id), &body)?;
 
         let patched_group: StoredParts<Group> =
             self.result_as_resource(result)?;
@@ -990,8 +984,7 @@ impl Tester {
         // The existing "Sales Reps" group should be empty
 
         let sales_reps_group_id = {
-            let result =
-                self.client.get(format!("{}/Groups", self.url)).send()?;
+            let result = self.get(format!("{}/Groups", self.url))?;
 
             if result.status() != StatusCode::OK {
                 bail!("listing groups returned {}", result.status());
@@ -1020,8 +1013,7 @@ impl Tester {
         // And the existing user's groups should be empty
 
         {
-            let result =
-                self.client.get(format!("{}/Users", self.url)).send()?;
+            let result = self.get(format!("{}/Users", self.url))?;
 
             if result.status() != StatusCode::OK {
                 bail!("listing users returned {}", result.status());
@@ -1052,11 +1044,10 @@ impl Tester {
             }
         );
 
-        let result = self
-            .client
-            .put(format!("{}/Groups/{}", self.url, sales_reps_group_id))
-            .json(&body)
-            .send()?;
+        let result = self.put(
+            format!("{}/Groups/{}", self.url, sales_reps_group_id),
+            &body,
+        )?;
 
         if result.status() != StatusCode::NOT_FOUND {
             bail!(
@@ -1079,11 +1070,10 @@ impl Tester {
             }
         );
 
-        let result = self
-            .client
-            .put(format!("{}/Groups/{}", self.url, sales_reps_group_id))
-            .json(&body)
-            .send()?;
+        let result = self.put(
+            format!("{}/Groups/{}", self.url, sales_reps_group_id),
+            &body,
+        )?;
 
         if result.status() != StatusCode::OK {
             bail!(
@@ -1096,10 +1086,7 @@ impl Tester {
         // Now, that user should have this group in its `groups` field.
 
         {
-            let result = self
-                .client
-                .get(format!("{}/Users/{}", self.url, jim.id))
-                .send()?;
+            let result = self.get(format!("{}/Users/{}", self.url, jim.id))?;
 
             if result.status() != StatusCode::OK {
                 bail!(
@@ -1136,9 +1123,7 @@ impl Tester {
 
         {
             let result = self
-                .client
-                .get(format!("{}/Groups/{}", self.url, sales_reps_group_id))
-                .send()?;
+                .get(format!("{}/Groups/{}", self.url, sales_reps_group_id))?;
 
             if result.status() != StatusCode::OK {
                 bail!(
@@ -1205,11 +1190,10 @@ impl Tester {
             }
         );
 
-        let result = self
-            .client
-            .put(format!("{}/Groups/{}", self.url, sales_reps_group_id))
-            .json(&body)
-            .send()?;
+        let result = self.put(
+            format!("{}/Groups/{}", self.url, sales_reps_group_id),
+            &body,
+        )?;
 
         if result.status() != StatusCode::OK {
             bail!(
@@ -1223,9 +1207,7 @@ impl Tester {
 
         {
             let result = self
-                .client
-                .get(format!("{}/Groups/{}", self.url, sales_reps_group_id))
-                .send()?;
+                .get(format!("{}/Groups/{}", self.url, sales_reps_group_id))?;
 
             if result.status() != StatusCode::OK {
                 bail!(
@@ -1283,11 +1265,7 @@ impl Tester {
             }
         );
 
-        let result = self
-            .client
-            .post(format!("{}/Groups", self.url))
-            .json(&body)
-            .send()?;
+        let result = self.post(format!("{}/Groups", self.url), &body)?;
 
         if result.status() != StatusCode::CREATED {
             bail!(
@@ -1327,10 +1305,8 @@ impl Tester {
         // Dwight should have two groups in the User resource field
 
         {
-            let result = self
-                .client
-                .get(format!("{}/Users/{}", self.url, dwight.id))
-                .send()?;
+            let result =
+                self.get(format!("{}/Users/{}", self.url, dwight.id))?;
 
             if result.status() != StatusCode::OK {
                 bail!(
@@ -1375,10 +1351,7 @@ impl Tester {
         // Jim should have one still
 
         {
-            let result = self
-                .client
-                .get(format!("{}/Users/{}", self.url, jim.id))
-                .send()?;
+            let result = self.get(format!("{}/Users/{}", self.url, jim.id))?;
 
             if result.status() != StatusCode::OK {
                 bail!(
@@ -1414,10 +1387,8 @@ impl Tester {
         // if the AARM group is deleted, dwight's membership should change
 
         {
-            let result = self
-                .client
-                .delete(format!("{}/Groups/{}", self.url, aarm_group.id))
-                .send()?;
+            let result =
+                self.delete(format!("{}/Groups/{}", self.url, aarm_group.id))?;
 
             if result.status() != StatusCode::NO_CONTENT {
                 bail!(
@@ -1429,10 +1400,8 @@ impl Tester {
         }
 
         {
-            let result = self
-                .client
-                .get(format!("{}/Users/{}", self.url, dwight.id))
-                .send()?;
+            let result =
+                self.get(format!("{}/Users/{}", self.url, dwight.id))?;
 
             if result.status() != StatusCode::OK {
                 bail!(

@@ -22,7 +22,7 @@ fn main() -> anyhow::Result<()> {
     let tester = match opt.bearer {
         Some(bearer) => Tester::new_with_bearer_auth(opt.url, bearer)?,
 
-        None => Tester::new(opt.url),
+        None => Tester::new(opt.url)?,
     };
 
     tester.run()?;
