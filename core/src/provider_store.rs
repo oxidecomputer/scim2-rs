@@ -69,8 +69,8 @@ pub trait ProviderStore: Sync {
     ) -> Result<ProviderStoreDeleteResult, ProviderStoreError>;
 }
 
-/// The backing store for users and groups may throw its own error type, or it
-/// may throw a SCIM error.
+/// The backing store for users and groups may return its own error or a SCIM
+/// specific error.
 #[derive(Debug)]
 pub enum ProviderStoreError {
     StoreError(anyhow::Error),
