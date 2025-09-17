@@ -192,7 +192,7 @@ fn status_code_schema(_: &mut SchemaGenerator) -> Schema {
 }
 
 /// The SCIM error format is specified in RFC 7644, section 3.12
-#[derive(Deserialize, Serialize, JsonSchema, Debug)]
+#[derive(Deserialize, Serialize, JsonSchema, Debug, PartialEq)]
 pub struct Error {
     pub schemas: Vec<String>,
 

@@ -55,7 +55,7 @@ impl<T: ProviderStore> Provider<T> {
         query_params: QueryParams,
     ) -> Result<ListResponse, Error> {
         let stored_users =
-            self.store.list_users(query_params.filter()).await.map_err(
+            self.store.list_users(query_params.filter()?).await.map_err(
                 provider_error_to_error(
                     &self.log,
                     "list users failed!".to_string(),
@@ -187,7 +187,7 @@ impl<T: ProviderStore> Provider<T> {
         query_params: QueryParams,
     ) -> Result<ListResponse, Error> {
         let stored_groups =
-            self.store.list_groups(query_params.filter()).await.map_err(
+            self.store.list_groups(query_params.filter()?).await.map_err(
                 provider_error_to_error(
                     &self.log,
                     "list groups failed!".to_string(),
