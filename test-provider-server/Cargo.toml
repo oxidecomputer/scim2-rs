@@ -15,6 +15,5 @@ slog.workspace = true
 clap.workspace = true
 tokio.workspace = true
 http.workspace = true
-async-trait.workspace = true
 
 scim2-rs = { path = "../core" }

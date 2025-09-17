@@ -2,15 +2,13 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 
-use async_trait::async_trait;
-
 use crate::response::Error;
 use crate::{
     CreateGroupRequest, CreateUserRequest, FilterOp, Group, StoredParts, User,
 };
 
 /// The durable store for users and groups
-#[async_trait]
+#[trait_variant::make]
 pub trait ProviderStore: Sync {
     async fn get_user_by_id(
         &self,

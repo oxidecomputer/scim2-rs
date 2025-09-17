@@ -10,7 +10,6 @@ use crate::{
     StoredParts, User, UserGroup, UserGroupType,
 };
 
-use async_trait::async_trait;
 use chrono::Utc;
 use schemars::JsonSchema;
 use serde::Serialize;
@@ -120,7 +119,6 @@ impl InMemoryProviderStore {
     }
 }
 
-#[async_trait]
 impl ProviderStore for InMemoryProviderStore {
     async fn get_user_by_id(
         &self,
