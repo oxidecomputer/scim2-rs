@@ -82,11 +82,6 @@ impl From<Error> for ProviderStoreError {
         ProviderStoreError::Scim(e)
     }
 }
-impl From<anyhow::Error> for ProviderStoreError {
-    fn from(e: anyhow::Error) -> ProviderStoreError {
-        ProviderStoreError::StoreError(e)
-    }
-}
 
 #[derive(Debug)]
 pub enum ProviderStoreDeleteResult {
