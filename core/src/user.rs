@@ -6,7 +6,7 @@ use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
 use crate::Resource;
-use crate::skip_serializing_list;
+use crate::utils::skip_serializing_list;
 
 #[derive(Deserialize, JsonSchema, Clone)]
 #[serde(rename_all = "camelCase")]

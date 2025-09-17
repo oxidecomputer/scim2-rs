@@ -3,10 +3,11 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 
 use crate::response::Error;
+use crate::utils::ResourceType;
 use crate::{
     CreateGroupRequest, CreateUserRequest, FilterOp, Group, GroupMember,
-    ProviderStore, ProviderStoreDeleteResult, ProviderStoreError, ResourceType,
-    StoredMeta, StoredParts, User, UserGroup, UserGroupType,
+    ProviderStore, ProviderStoreDeleteResult, ProviderStoreError, StoredMeta,
+    StoredParts, User, UserGroup, UserGroupType,
 };
 
 use async_trait::async_trait;

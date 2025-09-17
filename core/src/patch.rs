@@ -9,9 +9,9 @@ use unicase::UniCase;
 
 use crate::Group;
 use crate::GroupMember;
-use crate::ResourceType;
 use crate::StoredParts;
 use crate::User;
+use crate::utils::ResourceType;
 
 #[derive(Debug)]
 pub enum PatchRequestError {
