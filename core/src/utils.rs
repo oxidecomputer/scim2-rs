@@ -44,6 +44,21 @@ impl std::str::FromStr for ResourceType {
     }
 }
 
+// We are emitting upper case values here since all of the examples in RFC 7643
+// use upper case even though the spec says that this value is not to be
+// interpreted as caseExact.
+//
+//   {
+//     "name" : "ResourceType",
+//     "attributes" : [
+//       {
+//         "name" : "id",
+//         "type" : "string",
+//         "caseExact" : false,
+//       },
+//     ......snip......
+//    }
+//
 impl std::fmt::Display for ResourceType {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match self {
