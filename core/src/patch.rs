@@ -20,13 +20,10 @@ pub enum PatchRequestError {
 }
 
 #[derive(Debug, Deserialize, JsonSchema, Clone)]
-#[serde(tag = "op")]
+#[serde(tag = "op", rename_all = "camelCase")]
 enum PatchOp {
-    #[serde(rename = "replace")]
     Replace { path: Option<String>, value: serde_json::Value },
-    #[serde(rename = "add")]
     Add { path: Option<String>, value: serde_json::Value },
-    #[serde(rename = "remove")]
     Remove { path: String },
 }
 
