@@ -4,7 +4,7 @@
 
 use dropshot::Body;
 use http::Response;
-use slog::{Logger, error};
+use slog::{Logger, debug, error};
 
 use crate::in_memory_provider_store::{
     InMemoryProviderStore, InMemoryProviderStoreState,
@@ -54,13 +54,15 @@ impl<T: ProviderStore> Provider<T> {
         &self,
         query_params: QueryParams,
     ) -> Result<ListResponse, Error> {
-        let stored_users =
-            self.store.list_users(query_params.filter()?).await.map_err(
-                provider_error_to_error(
-                    &self.log,
-                    "list users failed!".to_string(),
-                ),
-            )?;
+        let filter = query_params.filter()?;
+        debug!(self.log, "filter value"; "filter" => ?filter);
+
+        let stored_users = self.store.list_users(filter).await.map_err(
+            provider_error_to_error(
+                &self.log,
+                "list users failed!".to_string(),
+            ),
+        )?;
 
         ListResponse::from_resources(stored_users, query_params)
     }
@@ -186,13 +188,15 @@ impl<T: ProviderStore> Provider<T> {
         &self,
         query_params: QueryParams,
     ) -> Result<ListResponse, Error> {
-        let stored_groups =
-            self.store.list_groups(query_params.filter()?).await.map_err(
-                provider_error_to_error(
-                    &self.log,
-                    "list groups failed!".to_string(),
-                ),
-            )?;
+        let filter = query_params.filter()?;
+        debug!(self.log, "filter value"; "filter" => ?filter);
+
+        let stored_groups = self.store.list_groups(filter).await.map_err(
+            provider_error_to_error(
+                &self.log,
+                "list groups failed!".to_string(),
+            ),
+        )?;
 
         ListResponse::from_resources(stored_groups, query_params)
     }
