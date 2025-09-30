@@ -57,6 +57,15 @@ impl PatchRequest {
         self.validate_schema()?;
         let mut updated_user = stored_user.clone();
 
+        // RFC 7644 3.5.2
+        //
+        // Each PATCH operation represents a single action to be applied to
+        // the same SCIM resource specified by the request URI.  Operations
+        // are applied sequentially in the order they appear in the array.
+        // Each operation in the sequence is applied to the target resource;
+        // the resulting resource becomes the target of the next operation.
+        // Evaluation continues until all operations are successfully applied or
+        // until an error condition is encountered.
         for patch_op in &self.operations {
             let PatchOp::Replace { path: _, value } = patch_op else {
                 return Err(PatchRequestError::Unsupported(
@@ -92,6 +101,15 @@ impl PatchRequest {
         self.validate_schema()?;
         let mut updated_group = stored_group.clone();
 
+        // RFC 7644 3.5.2
+        //
+        // Each PATCH operation represents a single action to be applied to
+        // the same SCIM resource specified by the request URI.  Operations
+        // are applied sequentially in the order they appear in the array.
+        // Each operation in the sequence is applied to the target resource;
+        // the resulting resource becomes the target of the next operation.
+        // Evaluation continues until all operations are successfully applied or
+        // until an error condition is encountered.
         for patch_op in &self.operations {
             match patch_op {
                 PatchOp::Replace { path, value } => apply_group_replace_op(
@@ -286,6 +304,10 @@ fn apply_group_remove_op(
         GroupRemoveOp::All => group.resource.members = Some(IdOrdMap::new()),
         GroupRemoveOp::Indvidual(value) => {
             let groups = group.resource.members.get_or_insert_default();
+            // Since these operations are applied one at a time in the order
+            // they appear in the "Operations" array we are not concerned with
+            // a remove operation that does not actually remove a value so we
+            // are ignoring the return value of the remove operation here.
             groups.remove(&Some(UniCase::new(value.as_str())));
         }
     };
