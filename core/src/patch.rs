@@ -251,8 +251,13 @@ fn parse_remove_path(path: &str) -> Result<GroupRemoveOp, PatchRequestError> {
     match path.as_str() {
         "members" => Ok(GroupRemoveOp::All),
         path => {
-            let path = path.trim_start_matches("members[value eq ");
-            let value = path.trim_end_matches(']');
+            let value = path
+                .strip_prefix("members[value eq ")
+                .and_then(|p| p.strip_suffix(']'))
+                .ok_or(PatchRequestError::Invalid(
+                    "path should be specified as members[value eq \"<VALUE>\"]"
+                        .to_string(),
+                ))?;
 
             // The value portion of the expression must be a string wrapped in
             // quotations
