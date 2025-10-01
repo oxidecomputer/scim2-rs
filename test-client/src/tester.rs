@@ -986,9 +986,10 @@ impl Tester {
             }
 
             if let Some(members) = &groups[0].members
-                && !members.is_empty() {
-                    bail!("existing Sales Reps group not empty!");
-                }
+                && !members.is_empty()
+            {
+                bail!("existing Sales Reps group not empty!");
+            }
 
             groups.pop().unwrap().id
         };
@@ -1006,9 +1007,10 @@ impl Tester {
 
             for user in &users {
                 if let Some(groups) = &user.groups
-                    && !groups.is_empty() {
-                        bail!("existing user {} groups not empty!", user.id);
-                    }
+                    && !groups.is_empty()
+                {
+                    bail!("existing user {} groups not empty!", user.id);
+                }
             }
         }
 
