@@ -985,11 +985,10 @@ impl Tester {
                 bail!("unexpected group returned!");
             }
 
-            if let Some(members) = &groups[0].members {
-                if !members.is_empty() {
+            if let Some(members) = &groups[0].members
+                && !members.is_empty() {
                     bail!("existing Sales Reps group not empty!");
                 }
-            }
 
             groups.pop().unwrap().id
         };
@@ -1006,11 +1005,10 @@ impl Tester {
             let users: Vec<User> = self.result_as_resource_list(result)?;
 
             for user in &users {
-                if let Some(groups) = &user.groups {
-                    if !groups.is_empty() {
+                if let Some(groups) = &user.groups
+                    && !groups.is_empty() {
                         bail!("existing user {} groups not empty!", user.id);
                     }
-                }
             }
         }
 

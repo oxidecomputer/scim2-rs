@@ -95,13 +95,12 @@ impl<T: ProviderStore> Provider<T> {
     ) -> Result<SingleResourceResponse, Error> {
         // `groups` is readOnly, so clients cannot add users to groups when
         // creating new users.
-        if let Some(groups) = &request.groups {
-            if !groups.is_empty() {
+        if let Some(groups) = &request.groups
+            && !groups.is_empty() {
                 return Err(Error::mutability(
                     "attribute groups is readOnly".to_string(),
                 ));
             }
-        }
 
         let StoredParts { resource, meta } =
             self.store.create_user(request).await.map_err(
