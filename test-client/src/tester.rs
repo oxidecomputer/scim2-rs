@@ -147,11 +147,13 @@ impl Tester {
         let resource: R =
             serde_json::from_value(serde_json::to_value(&response.resource)?)?;
 
-        // XXX needs fixing
-        //assert_eq!(
-        //    response.meta.location,
-        //    format!("{}/{}s/{}", self.url, R::resource_type(), resource.id())
-        //);
+        // TODO: This will work with the test suite but it does not yet work
+        // when using this test client against a real nexus implementation.
+        #[cfg(test)]
+        assert_eq!(
+            response.meta.location,
+            format!("{}/{}s/{}", self.url, R::resource_type(), resource.id())
+        );
 
         Ok(StoredParts { resource, meta: response.meta.into() })
     }
