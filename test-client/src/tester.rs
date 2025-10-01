@@ -184,7 +184,7 @@ impl Tester {
     }
 
     fn nonexistent_resource_tests(&self) -> anyhow::Result<()> {
-        let random_id = Uuid::new_v4().to_string();
+        let random_id = Uuid::new_v4();
 
         // A GET of non-existent user = 404
         let result = self.get(format!("{}/Users/{}", self.url, random_id))?;
@@ -1021,7 +1021,7 @@ impl Tester {
               "displayName": "Sales Reps",
               "members": [
                 {
-                  "value": Uuid::new_v4().to_string(),
+                  "value": Uuid::new_v4(),
                 }
               ]
             }
