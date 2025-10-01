@@ -7,8 +7,8 @@ use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use unicase::UniCase;
 
-use crate::Resource;
 use crate::utils::skip_serializing_list_map;
+use crate::{Resource, ResourceType};
 
 #[derive(Deserialize, JsonSchema, Clone)]
 #[serde(rename_all = "camelCase")]
@@ -46,8 +46,8 @@ impl Resource for Group {
         String::from("urn:ietf:params:scim:schemas:core:2.0:Group")
     }
 
-    fn resource_type() -> String {
-        String::from("Group")
+    fn resource_type() -> ResourceType {
+        ResourceType::Group
     }
 }
 

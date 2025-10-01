@@ -123,7 +123,7 @@ impl SingleResourceResponse {
         Ok(SingleResourceResponse {
             resource,
             meta: Meta {
-                resource_type: R::resource_type(),
+                resource_type: R::resource_type().to_string(),
                 created: meta.created,
                 last_modified: meta.last_modified,
                 version: meta.version,

@@ -4,8 +4,10 @@
 
 use serde::Serialize;
 
+use crate::ResourceType;
+
 pub trait Resource: std::fmt::Debug + Serialize {
     fn id(&self) -> String;
     fn schema() -> String;
-    fn resource_type() -> String;
+    fn resource_type() -> ResourceType;
 }
