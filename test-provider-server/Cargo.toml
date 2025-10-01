@@ -2,18 +2,18 @@
 name = "scim2-test-provider-server"
 version = "0.1.0"
 edition.workspace = true
+license.workspace = true
 
 [dependencies]
 anyhow.workspace = true
+clap.workspace = true
 dropshot.workspace = true
+http.workspace = true
 schemars.workspace = true
-serde_json.workspace = true
+scim2-rs.workspace = true
 serde.workspace = true
+serde_json.workspace = true
 slog-async.workspace = true
 slog-term.workspace = true
 slog.workspace = true
-clap.workspace = true
 tokio.workspace = true
-http.workspace = true
-
-scim2-rs = { path = "../core" }
