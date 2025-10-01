@@ -518,8 +518,8 @@ mod test {
     use uuid::Uuid;
 
     use crate::{
-        Group, ListResponse, Resource, ResourceType, SingleResourceResponse,
-        StoredMeta, StoredParts, User,
+        Group, ListResponse, PATCHOP_URN, Resource, ResourceType,
+        SingleResourceResponse, StoredMeta, StoredParts, User,
     };
 
     struct ServerCtx {
@@ -869,7 +869,7 @@ mod test {
         let body = json!(
             {
               "schemas": [
-                "urn:ietf:params:scim:api:messages:2.0:PatchOp"
+                  PATCHOP_URN
               ],
               "Operations": [
                 {
@@ -1146,7 +1146,7 @@ mod test {
         let new_display_name = "Warehouse Workers";
         let body = json!({
           "schemas": [
-            "urn:ietf:params:scim:api:messages:2.0:PatchOp"
+            PATCHOP_URN
           ],
           "Operations": [
             {
@@ -1180,7 +1180,7 @@ mod test {
 
         let body = json!({
           "schemas": [
-            "urn:ietf:params:scim:api:messages:2.0:PatchOp"
+            PATCHOP_URN
           ],
           "Operations": [
             {
@@ -1239,7 +1239,7 @@ mod test {
 
         let body = json!({
           "schemas": [
-            "urn:ietf:params:scim:api:messages:2.0:PatchOp"
+            PATCHOP_URN
           ],
           "Operations": [
             {
@@ -1285,7 +1285,7 @@ mod test {
 
         let body = json!({
           "schemas": [
-            "urn:ietf:params:scim:api:messages:2.0:PatchOp"
+            PATCHOP_URN
           ],
           "Operations": [
             {
@@ -1324,7 +1324,7 @@ mod test {
 
         let body = json!({
           "schemas": [
-            "urn:ietf:params:scim:api:messages:2.0:PatchOp"
+            PATCHOP_URN
           ],
           "Operations": [
             {
@@ -1377,7 +1377,7 @@ mod test {
 
         let body = json!({
           "schemas": [
-            "urn:ietf:params:scim:api:messages:2.0:PatchOp"
+            PATCHOP_URN
           ],
           "Operations": [
             {

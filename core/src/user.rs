@@ -6,7 +6,7 @@ use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
 use crate::utils::skip_serializing_list;
-use crate::{Resource, ResourceType};
+use crate::{Resource, ResourceType, USER_URN};
 
 #[derive(Deserialize, JsonSchema, Clone)]
 #[serde(rename_all = "camelCase")]
@@ -48,7 +48,7 @@ impl Resource for User {
     }
 
     fn schema() -> String {
-        String::from("urn:ietf:params:scim:schemas:core:2.0:User")
+        USER_URN.to_string()
     }
 
     fn resource_type() -> ResourceType {

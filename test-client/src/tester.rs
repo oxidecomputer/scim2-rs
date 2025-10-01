@@ -8,6 +8,7 @@ use reqwest::StatusCode;
 use reqwest::Url;
 use reqwest::blocking::Client;
 use reqwest::header;
+use scim2_rs::PATCHOP_URN;
 use serde::Serialize;
 use serde::de::DeserializeOwned;
 use serde_json::json;
@@ -410,7 +411,7 @@ impl Tester {
         let body = json!(
             {
               "schemas": [
-                "urn:ietf:params:scim:api:messages:2.0:PatchOp"
+                PATCHOP_URN
               ],
               "Operations": [
                 {
@@ -450,7 +451,7 @@ impl Tester {
         let body = json!(
             {
               "schemas": [
-                "urn:ietf:params:scim:api:messages:2.0:PatchOp"
+                PATCHOP_URN
               ],
               "Operations": [
                 {
@@ -770,7 +771,7 @@ impl Tester {
         // Use a patch request to modify the groups displayName.
         let body = json!({
           "schemas": [
-            "urn:ietf:params:scim:api:messages:2.0:PatchOp"
+            PATCHOP_URN
           ],
           "Operations": [
             {
@@ -800,7 +801,7 @@ impl Tester {
         // Set the displayName back to what it was
         let body = json!({
           "schemas": [
-            "urn:ietf:params:scim:api:messages:2.0:PatchOp"
+            PATCHOP_URN
           ],
           "Operations": [
             {
@@ -847,7 +848,7 @@ impl Tester {
 
         let body = json!({
           "schemas": [
-            "urn:ietf:params:scim:api:messages:2.0:PatchOp"
+            PATCHOP_URN
           ],
           "Operations": [
             {
@@ -896,7 +897,7 @@ impl Tester {
         //
         let body = json!({
           "schemas": [
-            "urn:ietf:params:scim:api:messages:2.0:PatchOp"
+            PATCHOP_URN
           ],
           "Operations": [
             {
@@ -934,7 +935,7 @@ impl Tester {
 
         let body = json!({
           "schemas": [
-            "urn:ietf:params:scim:api:messages:2.0:PatchOp"
+            PATCHOP_URN
           ],
           "Operations": [
             {

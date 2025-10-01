@@ -3,6 +3,10 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 
 use super::*;
+use scim2_rs::GROUP_URN;
+use scim2_rs::LISTRESPONSE_URN;
+use scim2_rs::RESOURCETYPE_URN;
+use scim2_rs::USER_URN;
 
 #[endpoint {
     method = GET,
@@ -19,7 +23,7 @@ pub async fn get_resource_types(
         .body(
             serde_json::json!({
               "schemas": [
-                "urn:ietf:params:scim:api:messages:2.0:ListResponse"
+                LISTRESPONSE_URN,
               ],
               "totalResults": 2,
               "startIndex": 1,
@@ -30,14 +34,14 @@ pub async fn get_resource_types(
                   "name": "User",
                   "description": "User Account",
                   "endpoint": "/Users",
-                  "schema": "urn:ietf:params:scim:schemas:core:2.0:User"
+                  "schema": USER_URN
                 },
                 {
                   "id": "Group",
                   "name": "Group",
                   "description": "Group",
                   "endpoint": "/Groups",
-                  "schema": "urn:ietf:params:scim:schemas:core:2.0:Group"
+                  "schema": GROUP_URN,
                 }
               ]
             }
@@ -63,13 +67,13 @@ pub async fn get_resource_type_user(
         .body(
             serde_json::json!({
               "schemas": [
-                "urn:ietf:params:scim:schemas:core:2.0:ResourceType"
+                RESOURCETYPE_URN
               ],
               "id": "User",
               "name": "User",
               "description": "User Account",
               "endpoint": "/Users",
-              "schema": "urn:ietf:params:scim:schemas:core:2.0:User"
+              "schema": USER_URN,
             }
             )
             .to_string()
@@ -93,13 +97,13 @@ pub async fn get_resource_type_group(
         .body(
             serde_json::json!({
               "schemas": [
-                "urn:ietf:params:scim:schemas:core:2.0:ResourceType"
+                RESOURCETYPE_URN
               ],
               "id": "Group",
               "name": "Group",
               "description": "Group",
               "endpoint": "/Groups",
-              "schema": "urn:ietf:params:scim:schemas:core:2.0:Group"
+              "schema": GROUP_URN,
             }
             )
             .to_string()
@@ -124,14 +128,14 @@ pub async fn get_schemas(
             serde_json::json!(
                 {
                   "schemas": [
-                    "urn:ietf:params:scim:api:messages:2.0:ListResponse"
+                    LISTRESPONSE_URN
                   ],
                   "totalResults": 2,
                   "startIndex": 1,
                   "itemsPerPage": 2,
                   "Resources": [
                     {
-                      "id": "urn:ietf:params:scim:schemas:core:2.0:User",
+                      "id": USER_URN,
                       "name": "User",
                       "attributes": [
                         {
@@ -152,7 +156,7 @@ pub async fn get_schemas(
                       ]
                     },
                     {
-                      "id": "urn:ietf:params:scim:schemas:core:2.0:Group",
+                      "id": GROUP_URN,
                       "name": "Group",
                       "attributes": [
                         {

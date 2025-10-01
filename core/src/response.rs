@@ -12,6 +12,7 @@ use serde::{Deserialize, Deserializer, Serialize};
 
 use crate::{
     Meta, PatchRequestError, QueryParams, Resource, StoredMeta, StoredParts,
+    urn::{ERROR_URN, LISTRESPONSE_URN},
 };
 
 const CONTENT_TYPE_SCIM_JSON: &str = "application/scim+json";
@@ -44,9 +45,7 @@ impl ListResponse {
     where
         R: Resource,
     {
-        let schemas = vec![String::from(
-            "urn:ietf:params:scim:api:messages:2.0:ListResponse",
-        )];
+        let schemas = vec![LISTRESPONSE_URN.to_string()];
 
         // TODO pagination should have happened before this, but fill in
         // start_index and items_per_page below based on query_params
@@ -215,9 +214,7 @@ impl Error {
         detail: String,
     ) -> Self {
         Self {
-            schemas: vec![String::from(
-                "urn:ietf:params:scim:api:messages:2.0:Error",
-            )],
+            schemas: vec![ERROR_URN.to_string()],
             status,
             error_type,
             detail,
@@ -305,7 +302,7 @@ pub fn value_to_http_response<S: Serialize>(
             .body(
                 serde_json::json!(
                     {
-                    "schemas": ["urn:ietf:params:scim:api:messages:2.0:Error"],
+                    "schemas": [ERROR_URN],
                     "status": 500,
                     "detail": format!("{error_context}: {e}"),
                     }

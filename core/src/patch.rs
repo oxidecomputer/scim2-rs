@@ -9,6 +9,7 @@ use unicase::UniCase;
 
 use crate::Group;
 use crate::GroupMember;
+use crate::PATCHOP_URN;
 use crate::StoredParts;
 use crate::User;
 use crate::utils::ResourceType;
@@ -38,8 +39,7 @@ impl PatchRequest {
     /// Ensure that the parsed `PatchRequest` contians the expected schema
     /// field.
     fn validate_schema(&self) -> Result<(), PatchRequestError> {
-        const URN: &str = "urn:ietf:params:scim:api:messages:2.0:PatchOp";
-        match matches!(&self.schemas[..], [val] if val == URN) {
+        match matches!(&self.schemas[..], [val] if val == PATCHOP_URN) {
             true => Ok(()),
             false => Err(PatchRequestError::Invalid(format!(
                 "invalid patch schema {:?}",
@@ -321,14 +321,14 @@ mod test {
 
     use crate::{
         PatchRequest,
-        patch::{GroupRemoveOp, parse_remove_path},
+        patch::{GroupRemoveOp, PATCHOP_URN, parse_remove_path},
     };
 
     #[test]
     fn test_parse_user_active_replace_op() {
         let json = json!({
           "schemas": [
-            "urn:ietf:params:scim:api:messages:2.0:PatchOp"
+            PATCHOP_URN
           ],
           "Operations": [
             {
@@ -347,7 +347,7 @@ mod test {
     fn test_parse_group_displayname_replace_op() {
         let json = json!({
           "schemas": [
-            "urn:ietf:params:scim:api:messages:2.0:PatchOp"
+            PATCHOP_URN
           ],
           "Operations": [
             {
@@ -367,7 +367,7 @@ mod test {
     fn test_parse_group_members_replace_op() {
         let json = json!({
           "schemas": [
-            "urn:ietf:params:scim:api:messages:2.0:PatchOp"
+            PATCHOP_URN
           ],
           "Operations": [
             {
@@ -390,7 +390,7 @@ mod test {
     fn test_parse_group_membership_ops() {
         let json = json!({
           "schemas": [
-            "urn:ietf:params:scim:api:messages:2.0:PatchOp"
+            PATCHOP_URN
           ],
           "Operations": [
             {
