@@ -19,12 +19,7 @@ struct Args {
 fn main() -> anyhow::Result<()> {
     let opt: Args = Args::try_parse()?;
 
-    let tester = match opt.bearer {
-        Some(bearer) => Tester::new_with_bearer_auth(opt.url, bearer)?,
-
-        None => Tester::new(opt.url)?,
-    };
-
+    let tester = Tester::new(opt.url, opt.bearer)?;
     tester.run()?;
 
     println!("SUCCESS");

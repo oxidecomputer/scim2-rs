@@ -31,10 +31,7 @@ pub struct Tester {
 }
 
 impl Tester {
-    pub fn new_with_bearer_auth(
-        url: String,
-        bearer: String,
-    ) -> anyhow::Result<Self> {
+    pub fn new(url: String, bearer: Option<String>) -> anyhow::Result<Self> {
         let mut headers = header::HeaderMap::new();
         headers.insert(
             header::CONTENT_TYPE,
@@ -46,29 +43,13 @@ impl Tester {
             header::ACCEPT,
             header::HeaderValue::from_str("application/scim+json")?,
         );
-        headers.insert(
-            header::AUTHORIZATION,
-            header::HeaderValue::from_str(&format!("Bearer {bearer}"))?,
-        );
 
-        let client =
-            Client::builder().default_headers(headers.clone()).build()?;
-
-        Ok(Self { url, client, headers })
-    }
-
-    pub fn new(url: String) -> anyhow::Result<Self> {
-        let mut headers = header::HeaderMap::new();
-        headers.insert(
-            header::CONTENT_TYPE,
-            header::HeaderValue::from_str(
-                "application/scim+json; charset=utf-8",
-            )?,
-        );
-        headers.insert(
-            header::ACCEPT,
-            header::HeaderValue::from_str("application/scim+json")?,
-        );
+        if let Some(bearer) = bearer {
+            headers.insert(
+                header::AUTHORIZATION,
+                header::HeaderValue::from_str(&format!("Bearer {bearer}"))?,
+            );
+        }
 
         let client =
             Client::builder().default_headers(headers.clone()).build()?;
