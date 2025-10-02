@@ -32,33 +32,26 @@ pub enum ResourceType {
     Group,
 }
 
+// We match case exact here.
+//
+// RFC 7644
+//
+// resourceType
+//     The name of the resource type of the resource.  This
+//     attribute has a mutability of "readOnly" and "caseExact" as
+//     "true".
 impl std::str::FromStr for ResourceType {
     type Err = String;
 
     fn from_str(r: &str) -> Result<Self, Self::Err> {
-        match r.to_lowercase().as_str() {
-            "user" => Ok(ResourceType::User),
-            "group" => Ok(ResourceType::Group),
+        match r {
+            "User" => Ok(ResourceType::User),
+            "Group" => Ok(ResourceType::Group),
             _ => Err(format!("{r} not a valid resource type")),
         }
     }
 }
 
-// We are emitting upper case values here since all of the examples in RFC 7643
-// use upper case even though the spec says that this value is not to be
-// interpreted as caseExact.
-//
-//   {
-//     "name" : "ResourceType",
-//     "attributes" : [
-//       {
-//         "name" : "id",
-//         "type" : "string",
-//         "caseExact" : false,
-//       },
-//     ......snip......
-//    }
-//
 impl std::fmt::Display for ResourceType {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match self {
