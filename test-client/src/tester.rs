@@ -4,9 +4,9 @@
 
 use anyhow::Context;
 use anyhow::bail;
+use reqwest::Client;
 use reqwest::StatusCode;
 use reqwest::Url;
-use reqwest::blocking::Client;
 use reqwest::header;
 use scim2_rs::PATCHOP_URN;
 use serde::Serialize;
@@ -57,89 +57,110 @@ impl Tester {
         Ok(Self { url, client, headers })
     }
 
-    fn get(
+    async fn get(
         &self,
         url: impl reqwest::IntoUrl,
-    ) -> Result<reqwest::blocking::Response, reqwest::Error> {
-        self.client.get(url).headers(self.headers.clone()).send()
+    ) -> Result<reqwest::Response, reqwest::Error> {
+        self.client.get(url).headers(self.headers.clone()).send().await
     }
 
-    fn post<T>(
-        &self,
-        url: impl reqwest::IntoUrl,
-        body: &T,
-    ) -> Result<reqwest::blocking::Response, reqwest::Error>
-    where
-        T: Serialize,
-    {
-        self.client.post(url).json(body).headers(self.headers.clone()).send()
-    }
-
-    fn put<T>(
+    async fn post<T>(
         &self,
         url: impl reqwest::IntoUrl,
         body: &T,
-    ) -> Result<reqwest::blocking::Response, reqwest::Error>
+    ) -> Result<reqwest::Response, reqwest::Error>
     where
         T: Serialize,
     {
-        self.client.put(url).json(body).headers(self.headers.clone()).send()
+        self.client
+            .post(url)
+            .json(body)
+            .headers(self.headers.clone())
+            .send()
+            .await
     }
 
-    fn patch<T>(
+    async fn put<T>(
         &self,
         url: impl reqwest::IntoUrl,
         body: &T,
-    ) -> Result<reqwest::blocking::Response, reqwest::Error>
+    ) -> Result<reqwest::Response, reqwest::Error>
     where
         T: Serialize,
     {
-        self.client.patch(url).json(body).headers(self.headers.clone()).send()
+        self.client
+            .put(url)
+            .json(body)
+            .headers(self.headers.clone())
+            .send()
+            .await
     }
 
-    fn delete(
+    async fn patch<T>(
         &self,
         url: impl reqwest::IntoUrl,
-    ) -> Result<reqwest::blocking::Response, reqwest::Error> {
-        self.client.delete(url).headers(self.headers.clone()).send()
+        body: &T,
+    ) -> Result<reqwest::Response, reqwest::Error>
+    where
+        T: Serialize,
+    {
+        self.client
+            .patch(url)
+            .json(body)
+            .headers(self.headers.clone())
+            .send()
+            .await
     }
 
-    pub fn run(&self) -> anyhow::Result<()> {
+    async fn delete(
+        &self,
+        url: impl reqwest::IntoUrl,
+    ) -> Result<reqwest::Response, reqwest::Error> {
+        self.client.delete(url).headers(self.headers.clone()).send().await
+    }
+
+    pub async fn run(&self) -> anyhow::Result<()> {
         self.nonexistent_resource_tests()
+            .await
             .context("nonexistent_resource_tests")?;
 
-        let dwight = self.create_user_tests().context("create_user_tests")?;
-        let jim = self.create_jim_user().context("create_jim_user")?;
+        let dwight =
+            self.create_user_tests().await.context("create_user_tests")?;
+        let jim = self.create_jim_user().await.context("create_jim_user")?;
 
-        self.list_users_test(&dwight, &jim).context("list_users_test")?;
+        self.list_users_test(&dwight, &jim).await.context("list_users_test")?;
         self.list_users_with_filter_test(&jim)
+            .await
             .context("list_users_with_filter_test")?;
 
-        self.replace_user_test(&jim).context("replace_user_test")?;
+        self.replace_user_test(&jim).await.context("replace_user_test")?;
 
-        self.patch_user_test(&jim).context("patch_user_test")?;
+        self.patch_user_test(&jim).await.context("patch_user_test")?;
 
         let sales_reps =
-            self.create_empty_group().context("create_empty_group")?;
+            self.create_empty_group().await.context("create_empty_group")?;
 
-        self.replace_group_test(&sales_reps).context("replace_group_test")?;
+        self.replace_group_test(&sales_reps)
+            .await
+            .context("replace_group_test")?;
 
         self.patch_group_test(&sales_reps, &jim, &dwight)
+            .await
             .context("patch_group_test")?;
 
-        self.test_groups(&dwight, &jim).context("test_groups")?;
+        self.test_groups(&dwight, &jim).await.context("test_groups")?;
 
         Ok(())
     }
 
-    fn result_as_resource<R>(
+    async fn result_as_resource<R>(
         &self,
-        result: reqwest::blocking::Response,
+        result: reqwest::Response,
     ) -> anyhow::Result<StoredParts<R>>
     where
         R: Resource + DeserializeOwned + Serialize,
     {
-        let response: SingleResourceResponse = result.json()?;
+        let response: SingleResourceResponse = result.json().await?;
 
         if !response.resource.schemas.contains(&R::schema()) {
             bail!("response does not contain {} schema", R::resource_type());
@@ -159,14 +180,14 @@ impl Tester {
         Ok(StoredParts { resource, meta: response.meta.into() })
     }
 
-    fn result_as_resource_list<R>(
+    async fn result_as_resource_list<R>(
         &self,
-        result: reqwest::blocking::Response,
+        result: reqwest::Response,
     ) -> anyhow::Result<Vec<R>>
     where
         R: Resource + DeserializeOwned + Serialize,
     {
-        let response: ListResponse = result.json()?;
+        let response: ListResponse = result.json().await?;
 
         let resources: Vec<R> =
             serde_json::from_value(serde_json::to_value(&response.resources)?)?;
@@ -184,11 +205,12 @@ impl Tester {
         Ok(resources)
     }
 
-    fn nonexistent_resource_tests(&self) -> anyhow::Result<()> {
+    async fn nonexistent_resource_tests(&self) -> anyhow::Result<()> {
         let random_id = Uuid::new_v4();
 
         // A GET of non-existent user = 404
-        let result = self.get(format!("{}/Users/{}", self.url, random_id))?;
+        let result =
+            self.get(format!("{}/Users/{}", self.url, random_id)).await?;
 
         if result.status() != StatusCode::NOT_FOUND {
             bail!(
@@ -203,8 +225,9 @@ impl Tester {
             "userName": "notblank",
         });
 
-        let result =
-            self.put(format!("{}/Users/{}", self.url, random_id), &body)?;
+        let result = self
+            .put(format!("{}/Users/{}", self.url, random_id), &body)
+            .await?;
 
         if result.status() != StatusCode::NOT_FOUND {
             bail!(
@@ -216,7 +239,7 @@ impl Tester {
 
         // DELETE of non-existent user = 404
         let result =
-            self.delete(format!("{}/Users/{}", self.url, random_id))?;
+            self.delete(format!("{}/Users/{}", self.url, random_id)).await?;
 
         if result.status() != StatusCode::NOT_FOUND {
             bail!(
@@ -227,7 +250,8 @@ impl Tester {
         }
 
         // A GET of non-existent group = 404
-        let result = self.get(format!("{}/Groups/{}", self.url, random_id))?;
+        let result =
+            self.get(format!("{}/Groups/{}", self.url, random_id)).await?;
 
         if result.status() != StatusCode::NOT_FOUND {
             bail!(
@@ -242,8 +266,9 @@ impl Tester {
             "displayName": "notblank",
         });
 
-        let result =
-            self.put(format!("{}/Groups/{}", self.url, random_id), &body)?;
+        let result = self
+            .put(format!("{}/Groups/{}", self.url, random_id), &body)
+            .await?;
 
         if result.status() != StatusCode::NOT_FOUND {
             bail!(
@@ -255,7 +280,7 @@ impl Tester {
 
         // DELETE of non-existent group = 404
         let result =
-            self.delete(format!("{}/Groups/{}", self.url, random_id))?;
+            self.delete(format!("{}/Groups/{}", self.url, random_id)).await?;
 
         if result.status() != StatusCode::NOT_FOUND {
             bail!(
@@ -268,13 +293,13 @@ impl Tester {
         Ok(())
     }
 
-    fn create_user_tests(&self) -> anyhow::Result<User> {
+    async fn create_user_tests(&self) -> anyhow::Result<User> {
         let body = json!({
             "userName": "dschrute",
             "externalId": "dschrute@dundermifflin.com",
         });
 
-        let result = self.post(format!("{}/Users", self.url), &body)?;
+        let result = self.post(format!("{}/Users", self.url), &body).await?;
 
         // RFC 7664 § 3.3:
         // When the service provider successfully creates the new resource, an
@@ -283,7 +308,7 @@ impl Tester {
             bail!("POST to /Users returned status code {}", result.status());
         }
 
-        let user: User = self.result_as_resource(result)?.resource;
+        let user: User = self.result_as_resource(result).await?.resource;
 
         if user.name != "dschrute" {
             bail!("user name of test user is {}, not dschrute", user.name);
@@ -308,7 +333,7 @@ impl Tester {
         // "uniqueness", as per Section 3.12.
 
         let conflict_result =
-            self.post(format!("{}/Users", self.url), &body)?;
+            self.post(format!("{}/Users", self.url), &body).await?;
 
         if conflict_result.status() != StatusCode::CONFLICT {
             bail!(
@@ -318,7 +343,7 @@ impl Tester {
             );
         }
 
-        let error: scim2_rs::Error = conflict_result.json()?;
+        let error: scim2_rs::Error = conflict_result.json().await?;
 
         if error.status() != StatusCode::CONFLICT {
             bail!(
@@ -343,27 +368,31 @@ impl Tester {
         Ok(user)
     }
 
-    fn create_jim_user(&self) -> anyhow::Result<User> {
+    async fn create_jim_user(&self) -> anyhow::Result<User> {
         let body = json!({
             "userName": "jhalpert",
             "externalId": "jhalpert@dundermifflin.com",
         });
 
-        let result = self.post(format!("{}/Users", self.url), &body)?;
+        let result = self.post(format!("{}/Users", self.url), &body).await?;
 
-        let user: User = self.result_as_resource(result)?.resource;
+        let user: User = self.result_as_resource(result).await?.resource;
 
         Ok(user)
     }
 
-    fn list_users_test(&self, dwight: &User, jim: &User) -> anyhow::Result<()> {
-        let result = self.get(format!("{}/Users", self.url))?;
+    async fn list_users_test(
+        &self,
+        dwight: &User,
+        jim: &User,
+    ) -> anyhow::Result<()> {
+        let result = self.get(format!("{}/Users", self.url)).await?;
 
         if result.status() != StatusCode::OK {
             bail!("listing users returned {}", result.status());
         }
 
-        let users: Vec<User> = self.result_as_resource_list(result)?;
+        let users: Vec<User> = self.result_as_resource_list(result).await?;
 
         if users.len() != 2 {
             bail!("users length is {}, not 2", users.len());
@@ -380,17 +409,20 @@ impl Tester {
         Ok(())
     }
 
-    fn list_users_with_filter_test(&self, jim: &User) -> anyhow::Result<()> {
+    async fn list_users_with_filter_test(
+        &self,
+        jim: &User,
+    ) -> anyhow::Result<()> {
         let mut url: Url = format!("{}/Users", self.url).parse().unwrap();
         url.set_query(Some(&format!("filter=username eq \"{}\"", jim.name)));
 
-        let result = self.get(url)?;
+        let result = self.get(url).await?;
 
         if result.status() != StatusCode::OK {
             bail!("listing users returned {}", result.status());
         }
 
-        let users: Vec<User> = self.result_as_resource_list(result)?;
+        let users: Vec<User> = self.result_as_resource_list(result).await?;
 
         if users.len() != 1 {
             bail!("users length is {}, not 1", users.len());
@@ -403,7 +435,7 @@ impl Tester {
         Ok(())
     }
 
-    fn patch_user_test(&self, jim: &User) -> anyhow::Result<()> {
+    async fn patch_user_test(&self, jim: &User) -> anyhow::Result<()> {
         let url: Url =
             format!("{}/Users/{}", self.url, jim.id).parse().unwrap();
 
@@ -424,7 +456,7 @@ impl Tester {
             }
         );
 
-        let result = self.patch(url.clone(), &body)?;
+        let result = self.patch(url.clone(), &body).await?;
 
         // RFC 7664 § 3.5.2:
         // On successful completion, the server either MUST return a 200 OK
@@ -441,7 +473,7 @@ impl Tester {
             );
         }
 
-        let jim: StoredParts<User> = self.result_as_resource(result)?;
+        let jim: StoredParts<User> = self.result_as_resource(result).await?;
 
         if jim.resource.active != Some(false) {
             bail!("users active field is not false",);
@@ -464,8 +496,8 @@ impl Tester {
             }
         );
 
-        let result = self.patch(url, &body)?;
-        let jim: StoredParts<User> = self.result_as_resource(result)?;
+        let result = self.patch(url, &body).await?;
+        let jim: StoredParts<User> = self.result_as_resource(result).await?;
 
         if jim.resource.active != Some(true) {
             bail!("users active field is not true",);
@@ -476,13 +508,15 @@ impl Tester {
         Ok(())
     }
 
-    fn replace_user_test(&self, jim: &User) -> anyhow::Result<()> {
+    async fn replace_user_test(&self, jim: &User) -> anyhow::Result<()> {
         // Store Jim's meta for later comparison
 
         let jim_meta: StoredMeta = {
-            let result = self.get(format!("{}/Users/{}", self.url, jim.id))?;
+            let result =
+                self.get(format!("{}/Users/{}", self.url, jim.id)).await?;
 
-            let parts: StoredParts<User> = self.result_as_resource(result)?;
+            let parts: StoredParts<User> =
+                self.result_as_resource(result).await?;
 
             parts.meta
         };
@@ -496,7 +530,7 @@ impl Tester {
         });
 
         let result =
-            self.put(format!("{}/Users/{}", self.url, jim.id), &body)?;
+            self.put(format!("{}/Users/{}", self.url, jim.id), &body).await?;
 
         // RFC 7664 § 3.5.1:
         // Unless otherwise specified, a successful PUT operation returns a 200
@@ -512,7 +546,7 @@ impl Tester {
             );
         }
 
-        let new_user: User = self.result_as_resource(result)?.resource;
+        let new_user: User = self.result_as_resource(result).await?.resource;
 
         if new_user == *jim {
             bail!("user PUT didn't work, same user returned")
@@ -520,9 +554,9 @@ impl Tester {
 
         // The new user should be returned by the GET now.
 
-        let result = self.get(format!("{}/Users/{}", self.url, jim.id))?;
+        let result = self.get(format!("{}/Users/{}", self.url, jim.id)).await?;
 
-        let check: StoredParts<User> = self.result_as_resource(result)?;
+        let check: StoredParts<User> = self.result_as_resource(result).await?;
 
         if new_user != check.resource {
             bail!("new user not returned after PUT");
@@ -537,7 +571,7 @@ impl Tester {
         // Revert the change.
 
         let result =
-            self.put(format!("{}/Users/{}", self.url, jim.id), &jim)?;
+            self.put(format!("{}/Users/{}", self.url, jim.id), &jim).await?;
 
         if result.status() != StatusCode::OK {
             bail!(
@@ -547,7 +581,7 @@ impl Tester {
             );
         }
 
-        let old_user: User = self.result_as_resource(result)?.resource;
+        let old_user: User = self.result_as_resource(result).await?.resource;
 
         if old_user != *jim {
             bail!("user revert PUT didn't work, new user returned")
@@ -562,9 +596,9 @@ impl Tester {
         });
 
         let result =
-            self.put(format!("{}/Users/{}", self.url, jim.id), &body)?;
+            self.put(format!("{}/Users/{}", self.url, jim.id), &body).await?;
 
-        let error: scim2_rs::Error = result.json()?;
+        let error: scim2_rs::Error = result.json().await?;
 
         if error.status() != StatusCode::CONFLICT {
             bail!(
@@ -593,7 +627,7 @@ impl Tester {
         });
 
         let result =
-            self.put(format!("{}/Users/{}", self.url, jim.id), &body)?;
+            self.put(format!("{}/Users/{}", self.url, jim.id), &body).await?;
 
         if result.status() != StatusCode::OK {
             bail!(
@@ -604,7 +638,8 @@ impl Tester {
         }
 
         {
-            let check_user: User = self.result_as_resource(result)?.resource;
+            let check_user: User =
+                self.result_as_resource(result).await?.resource;
 
             if check_user.active.is_some() {
                 bail!("active should be None, it's {:?}", check_user.active);
@@ -621,14 +656,14 @@ impl Tester {
         Ok(())
     }
 
-    fn create_empty_group(&self) -> anyhow::Result<Group> {
+    async fn create_empty_group(&self) -> anyhow::Result<Group> {
         let body = json!({
             "displayName": "Sales Reps",
             "externalId": "sales_reps",
             "members": [],
         });
 
-        let result = self.post(format!("{}/Groups", self.url), &body)?;
+        let result = self.post(format!("{}/Groups", self.url), &body).await?;
 
         // RFC 7664 § 3.3:
         // When the service provider successfully creates the new resource, an
@@ -637,7 +672,7 @@ impl Tester {
             bail!("POST to /Groups returned status code {}", result.status());
         }
 
-        let group: Group = self.result_as_resource(result)?.resource;
+        let group: Group = self.result_as_resource(result).await?.resource;
 
         if group.display_name != "Sales Reps" {
             bail!(
@@ -663,7 +698,7 @@ impl Tester {
         // in-memory provider store does not allow for duplicate groups.
 
         let conflict_result =
-            self.post(format!("{}/Groups", self.url), &body)?;
+            self.post(format!("{}/Groups", self.url), &body).await?;
 
         if conflict_result.status() != StatusCode::CONFLICT {
             bail!(
@@ -676,14 +711,15 @@ impl Tester {
         Ok(group)
     }
 
-    fn replace_group_test(&self, group: &Group) -> anyhow::Result<()> {
+    async fn replace_group_test(&self, group: &Group) -> anyhow::Result<()> {
         // Store the group's meta for later comparison
 
         let group_meta: StoredMeta = {
             let result =
-                self.get(format!("{}/Groups/{}", self.url, group.id))?;
+                self.get(format!("{}/Groups/{}", self.url, group.id)).await?;
 
-            let parts: StoredParts<Group> = self.result_as_resource(result)?;
+            let parts: StoredParts<Group> =
+                self.result_as_resource(result).await?;
 
             parts.meta
         };
@@ -695,8 +731,9 @@ impl Tester {
             "displayName": "Sales Reps",
         });
 
-        let result =
-            self.put(format!("{}/Groups/{}", self.url, group.id), &body)?;
+        let result = self
+            .put(format!("{}/Groups/{}", self.url, group.id), &body)
+            .await?;
 
         // RFC 7664 § 3.5.1:
         // Unless otherwise specified, a successful PUT operation returns a 200
@@ -712,7 +749,7 @@ impl Tester {
             );
         }
 
-        let new_group: Group = self.result_as_resource(result)?.resource;
+        let new_group: Group = self.result_as_resource(result).await?.resource;
 
         // External ID should None
 
@@ -725,9 +762,10 @@ impl Tester {
 
         // The new group should be returned by the GET now.
 
-        let result = self.get(format!("{}/Groups/{}", self.url, group.id))?;
+        let result =
+            self.get(format!("{}/Groups/{}", self.url, group.id)).await?;
 
-        let check: StoredParts<Group> = self.result_as_resource(result)?;
+        let check: StoredParts<Group> = self.result_as_resource(result).await?;
 
         if new_group != check.resource {
             bail!("new group not returned after PUT");
@@ -741,8 +779,9 @@ impl Tester {
 
         // Revert the change.
 
-        let result =
-            self.put(format!("{}/Groups/{}", self.url, group.id), &group)?;
+        let result = self
+            .put(format!("{}/Groups/{}", self.url, group.id), &group)
+            .await?;
 
         if result.status() != StatusCode::OK {
             bail!(
@@ -752,7 +791,7 @@ impl Tester {
             );
         }
 
-        let old_group: Group = self.result_as_resource(result)?.resource;
+        let old_group: Group = self.result_as_resource(result).await?.resource;
 
         if old_group != *group {
             bail!("group revert PUT didn't work, new group returned")
@@ -761,7 +800,7 @@ impl Tester {
         Ok(())
     }
 
-    fn patch_group_test(
+    async fn patch_group_test(
         &self,
         group: &Group,
         jim: &User,
@@ -784,10 +823,11 @@ impl Tester {
           ]
         });
 
-        let result =
-            self.patch(format!("{}/Groups/{}", self.url, group.id), &body)?;
+        let result = self
+            .patch(format!("{}/Groups/{}", self.url, group.id), &body)
+            .await?;
         let patched_group: StoredParts<Group> =
-            self.result_as_resource(result)?;
+            self.result_as_resource(result).await?;
 
         // Make sure the group displayName has changed
 
@@ -814,10 +854,11 @@ impl Tester {
           ]
         });
 
-        let result =
-            self.patch(format!("{}/Groups/{}", self.url, group.id), &body)?;
+        let result = self
+            .patch(format!("{}/Groups/{}", self.url, group.id), &body)
+            .await?;
         let patched_group: StoredParts<Group> =
-            self.result_as_resource(result)?;
+            self.result_as_resource(result).await?;
 
         // Make sure the group displayName was reverted
 
@@ -830,10 +871,11 @@ impl Tester {
 
         // Grab a handle to the stored group
 
-        let result = self.get(format!("{}/Groups/{}", self.url, group.id))?;
+        let result =
+            self.get(format!("{}/Groups/{}", self.url, group.id)).await?;
 
         let stored_group: StoredParts<Group> =
-            self.result_as_resource(result)?;
+            self.result_as_resource(result).await?;
 
         // Make sure we are starting with an empty group member list
 
@@ -868,10 +910,11 @@ impl Tester {
           ]
         });
 
-        let result =
-            self.patch(format!("{}/Groups/{}", self.url, group.id), &body)?;
+        let result = self
+            .patch(format!("{}/Groups/{}", self.url, group.id), &body)
+            .await?;
         let patched_group: StoredParts<Group> =
-            self.result_as_resource(result)?;
+            self.result_as_resource(result).await?;
 
         if !patched_group.resource.members.as_ref().is_some_and(|m| {
             m.contains_key(&Some(UniCase::new(jim.id.as_str())))
@@ -907,11 +950,12 @@ impl Tester {
           ]
         });
 
-        let result =
-            self.patch(format!("{}/Groups/{}", self.url, group.id), &body)?;
+        let result = self
+            .patch(format!("{}/Groups/{}", self.url, group.id), &body)
+            .await?;
 
         let patched_group: StoredParts<Group> =
-            self.result_as_resource(result)?;
+            self.result_as_resource(result).await?;
 
         if patched_group.resource.members.as_ref().is_some_and(|m| {
             m.contains_key(&Some(UniCase::new(jim.id.as_str())))
@@ -945,11 +989,12 @@ impl Tester {
           ]
         });
 
-        let result =
-            self.patch(format!("{}/Groups/{}", self.url, group.id), &body)?;
+        let result = self
+            .patch(format!("{}/Groups/{}", self.url, group.id), &body)
+            .await?;
 
         let patched_group: StoredParts<Group> =
-            self.result_as_resource(result)?;
+            self.result_as_resource(result).await?;
 
         if !patched_group.resource.members.unwrap_or_default().is_empty() {
             bail!(
@@ -964,18 +1009,22 @@ impl Tester {
         Ok(())
     }
 
-    fn test_groups(&self, dwight: &User, jim: &User) -> anyhow::Result<()> {
+    async fn test_groups(
+        &self,
+        dwight: &User,
+        jim: &User,
+    ) -> anyhow::Result<()> {
         // The existing "Sales Reps" group should be empty
 
         let sales_reps_group_id = {
-            let result = self.get(format!("{}/Groups", self.url))?;
+            let result = self.get(format!("{}/Groups", self.url)).await?;
 
             if result.status() != StatusCode::OK {
                 bail!("listing groups returned {}", result.status());
             }
 
             let mut groups: Vec<Group> =
-                self.result_as_resource_list(result)?;
+                self.result_as_resource_list(result).await?;
 
             if groups.len() != 1 {
                 bail!("more than one group returned!");
@@ -997,13 +1046,13 @@ impl Tester {
         // And the existing user's groups should be empty
 
         {
-            let result = self.get(format!("{}/Users", self.url))?;
+            let result = self.get(format!("{}/Users", self.url)).await?;
 
             if result.status() != StatusCode::OK {
                 bail!("listing users returned {}", result.status());
             }
 
-            let users: Vec<User> = self.result_as_resource_list(result)?;
+            let users: Vec<User> = self.result_as_resource_list(result).await?;
 
             for user in &users {
                 if let Some(groups) = &user.groups
@@ -1028,10 +1077,9 @@ impl Tester {
             }
         );
 
-        let result = self.put(
-            format!("{}/Groups/{}", self.url, sales_reps_group_id),
-            &body,
-        )?;
+        let result = self
+            .put(format!("{}/Groups/{}", self.url, sales_reps_group_id), &body)
+            .await?;
 
         if result.status() != StatusCode::NOT_FOUND {
             bail!(
@@ -1054,10 +1102,9 @@ impl Tester {
             }
         );
 
-        let result = self.put(
-            format!("{}/Groups/{}", self.url, sales_reps_group_id),
-            &body,
-        )?;
+        let result = self
+            .put(format!("{}/Groups/{}", self.url, sales_reps_group_id), &body)
+            .await?;
 
         if result.status() != StatusCode::OK {
             bail!(
@@ -1070,7 +1117,8 @@ impl Tester {
         // Now, that user should have this group in its `groups` field.
 
         {
-            let result = self.get(format!("{}/Users/{}", self.url, jim.id))?;
+            let result =
+                self.get(format!("{}/Users/{}", self.url, jim.id)).await?;
 
             if result.status() != StatusCode::OK {
                 bail!(
@@ -1080,7 +1128,8 @@ impl Tester {
                 );
             }
 
-            let first_user: User = self.result_as_resource(result)?.resource;
+            let first_user: User =
+                self.result_as_resource(result).await?.resource;
 
             let Some(first_user_groups) = &first_user.groups else {
                 bail!("first user's groups should be Some");
@@ -1107,7 +1156,8 @@ impl Tester {
 
         {
             let result = self
-                .get(format!("{}/Groups/{}", self.url, sales_reps_group_id))?;
+                .get(format!("{}/Groups/{}", self.url, sales_reps_group_id))
+                .await?;
 
             if result.status() != StatusCode::OK {
                 bail!(
@@ -1117,7 +1167,7 @@ impl Tester {
                 );
             }
 
-            let check: Group = self.result_as_resource(result)?.resource;
+            let check: Group = self.result_as_resource(result).await?.resource;
 
             let Some(check_members) = &check.members else {
                 bail!("expected group to have Some members");
@@ -1174,10 +1224,9 @@ impl Tester {
             }
         );
 
-        let result = self.put(
-            format!("{}/Groups/{}", self.url, sales_reps_group_id),
-            &body,
-        )?;
+        let result = self
+            .put(format!("{}/Groups/{}", self.url, sales_reps_group_id), &body)
+            .await?;
 
         if result.status() != StatusCode::OK {
             bail!(
@@ -1191,7 +1240,8 @@ impl Tester {
 
         {
             let result = self
-                .get(format!("{}/Groups/{}", self.url, sales_reps_group_id))?;
+                .get(format!("{}/Groups/{}", self.url, sales_reps_group_id))
+                .await?;
 
             if result.status() != StatusCode::OK {
                 bail!(
@@ -1201,7 +1251,7 @@ impl Tester {
                 );
             }
 
-            let check: Group = self.result_as_resource(result)?.resource;
+            let check: Group = self.result_as_resource(result).await?.resource;
 
             let Some(check_members) = &check.members else {
                 bail!("expected group to have Some members");
@@ -1249,7 +1299,7 @@ impl Tester {
             }
         );
 
-        let result = self.post(format!("{}/Groups", self.url), &body)?;
+        let result = self.post(format!("{}/Groups", self.url), &body).await?;
 
         if result.status() != StatusCode::CREATED {
             bail!(
@@ -1259,7 +1309,7 @@ impl Tester {
             );
         }
 
-        let aarm_group: Group = self.result_as_resource(result)?.resource;
+        let aarm_group: Group = self.result_as_resource(result).await?.resource;
 
         // This new group should only have Dwight in it
 
@@ -1290,7 +1340,7 @@ impl Tester {
 
         {
             let result =
-                self.get(format!("{}/Users/{}", self.url, dwight.id))?;
+                self.get(format!("{}/Users/{}", self.url, dwight.id)).await?;
 
             if result.status() != StatusCode::OK {
                 bail!(
@@ -1300,7 +1350,8 @@ impl Tester {
                 );
             }
 
-            let check_dwight: User = self.result_as_resource(result)?.resource;
+            let check_dwight: User =
+                self.result_as_resource(result).await?.resource;
 
             let Some(check_dwight_groups) = &check_dwight.groups else {
                 bail!("dwight's groups should be Some");
@@ -1335,7 +1386,8 @@ impl Tester {
         // Jim should have one still
 
         {
-            let result = self.get(format!("{}/Users/{}", self.url, jim.id))?;
+            let result =
+                self.get(format!("{}/Users/{}", self.url, jim.id)).await?;
 
             if result.status() != StatusCode::OK {
                 bail!(
@@ -1345,7 +1397,8 @@ impl Tester {
                 );
             }
 
-            let check_jim: User = self.result_as_resource(result)?.resource;
+            let check_jim: User =
+                self.result_as_resource(result).await?.resource;
 
             let Some(check_jim_groups) = &check_jim.groups else {
                 bail!("jim's groups should be Some");
@@ -1368,11 +1421,12 @@ impl Tester {
             }
         }
 
-        // if the AARM group is deleted, dwight's membership should change
+        // if the AARM group is deleted, Dwight's membership should change
 
         {
-            let result =
-                self.delete(format!("{}/Groups/{}", self.url, aarm_group.id))?;
+            let result = self
+                .delete(format!("{}/Groups/{}", self.url, aarm_group.id))
+                .await?;
 
             if result.status() != StatusCode::NO_CONTENT {
                 bail!(
@@ -1385,7 +1439,7 @@ impl Tester {
 
         {
             let result =
-                self.get(format!("{}/Users/{}", self.url, dwight.id))?;
+                self.get(format!("{}/Users/{}", self.url, dwight.id)).await?;
 
             if result.status() != StatusCode::OK {
                 bail!(
@@ -1395,7 +1449,8 @@ impl Tester {
                 );
             }
 
-            let check_dwight: User = self.result_as_resource(result)?.resource;
+            let check_dwight: User =
+                self.result_as_resource(result).await?.resource;
 
             let Some(check_dwight_groups) = &check_dwight.groups else {
                 bail!("dwight's groups should be Some");
