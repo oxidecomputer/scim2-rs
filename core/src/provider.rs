@@ -146,7 +146,7 @@ impl<T: ProviderStore> Provider<T> {
             .ok_or(Error::not_found(user_id.to_string()))?;
 
         let StoredParts { resource: user, meta: _ } =
-            request.apply_user_ops(&stored_user)?;
+            request.apply_user_ops(&self.log, &stored_user)?;
 
         let request = CreateUserRequest {
             name: user.name,
@@ -288,7 +288,7 @@ impl<T: ProviderStore> Provider<T> {
             .ok_or(Error::not_found(group_id.to_string()))?;
 
         let StoredParts { resource: group, meta: _ } =
-            request.apply_group_ops(&stored_group)?;
+            request.apply_group_ops(&self.log, &stored_group)?;
 
         let request = CreateGroupRequest {
             display_name: group.display_name,
