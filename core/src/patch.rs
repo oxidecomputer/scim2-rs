@@ -7,7 +7,6 @@ use schemars::JsonSchema;
 use serde::Deserialize;
 use slog::Logger;
 use slog::info;
-use slog::warn;
 use unicase::UniCase;
 
 use crate::Group;
@@ -358,7 +357,7 @@ fn apply_group_remove_op(
                     "member" => ?removed,
                 ),
                 None => {
-                    warn!(
+                    info!(
                         log,
                         "PatchOp attempted to remove non group member";
                         "group" => %group.resource.id,
