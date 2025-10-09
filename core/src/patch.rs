@@ -70,12 +70,34 @@ impl PatchRequest {
         // Evaluation continues until all operations are successfully applied or
         // until an error condition is encountered.
         for patch_op in &self.operations {
-            let PatchOp::Replace { path: _, value } = patch_op else {
+            let PatchOp::Replace { path, value } = patch_op else {
                 return Err(PatchRequestError::Unsupported(
                     "only the replace op is supported for users".to_string(),
                 ));
             };
 
+            // 3.5.2.3.  Replace Operation
+            //
+            // If the "path" parameter is omitted, the target is assumed to be
+            // the resource itself.  In this case, the "value" attribute SHALL
+            // contain a list of one or more attributes that are to be replaced.
+            //
+            // NB: We are only allowing changes to the resource itself until
+            // we support other IdPs outside of Okta.
+            if let Some(_path) = path {
+                return Err(PatchRequestError::Unsupported(
+                    "only replacing a value on the User resource itself is
+                        supported"
+                        .to_string(),
+                ));
+            }
+
+            // The changes coming in via a replace operation may change multiple
+            // fields at once, however we only care about the `active` field.
+            // We considered using `#[serde(deny_unknown_fields)]` here but that
+            // would break any request that sends multiple values at once. Most
+            // of the values that would be sent here are not currently tracked
+            // in our `User` type as they are irrelevant.
             #[derive(Debug, Deserialize)]
             struct Active {
                 active: bool,
