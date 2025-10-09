@@ -277,7 +277,6 @@ fn apply_group_add_op(
         #[derive(Debug, Deserialize)]
         struct Member {
             value: String,
-            display: String,
         }
         let Ok(member) = serde_json::from_value::<Member>(member.clone())
         else {
@@ -285,13 +284,6 @@ fn apply_group_add_op(
                 "group add op member value expected".to_string(),
             ));
         };
-
-        if group.resource.display_name.eq_ignore_ascii_case(&member.display) {
-            return Err(PatchRequestError::Invalid(format!(
-                "group add op value display was {} expected {}",
-                member.display, group.resource.display_name
-            )));
-        }
 
         // 3.5.2.1.  Add Operation
         //
