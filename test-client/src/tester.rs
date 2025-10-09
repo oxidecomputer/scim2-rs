@@ -8,6 +8,7 @@ use reqwest::StatusCode;
 use reqwest::Url;
 use reqwest::blocking::Client;
 use reqwest::header;
+use scim2_rs::PATCHOP_URN;
 use serde::Serialize;
 use serde::de::DeserializeOwned;
 use serde_json::json;
@@ -31,10 +32,7 @@ pub struct Tester {
 }
 
 impl Tester {
-    pub fn new_with_bearer_auth(
-        url: String,
-        bearer: String,
-    ) -> anyhow::Result<Self> {
+    pub fn new(url: String, bearer: Option<String>) -> anyhow::Result<Self> {
         let mut headers = header::HeaderMap::new();
         headers.insert(
             header::CONTENT_TYPE,
@@ -46,29 +44,13 @@ impl Tester {
             header::ACCEPT,
             header::HeaderValue::from_str("application/scim+json")?,
         );
-        headers.insert(
-            header::AUTHORIZATION,
-            header::HeaderValue::from_str(&format!("Bearer {bearer}"))?,
-        );
 
-        let client =
-            Client::builder().default_headers(headers.clone()).build()?;
-
-        Ok(Self { url, client, headers })
-    }
-
-    pub fn new(url: String) -> anyhow::Result<Self> {
-        let mut headers = header::HeaderMap::new();
-        headers.insert(
-            header::CONTENT_TYPE,
-            header::HeaderValue::from_str(
-                "application/scim+json; charset=utf-8",
-            )?,
-        );
-        headers.insert(
-            header::ACCEPT,
-            header::HeaderValue::from_str("application/scim+json")?,
-        );
+        if let Some(bearer) = bearer {
+            headers.insert(
+                header::AUTHORIZATION,
+                header::HeaderValue::from_str(&format!("Bearer {bearer}"))?,
+            );
+        }
 
         let client =
             Client::builder().default_headers(headers.clone()).build()?;
@@ -166,11 +148,13 @@ impl Tester {
         let resource: R =
             serde_json::from_value(serde_json::to_value(&response.resource)?)?;
 
-        // XXX needs fixing
-        //assert_eq!(
-        //    response.meta.location,
-        //    format!("{}/{}s/{}", self.url, R::resource_type(), resource.id())
-        //);
+        // TODO: This will work with the test suite but it does not yet work
+        // when using this test client against a real nexus implementation.
+        #[cfg(test)]
+        assert_eq!(
+            response.meta.location,
+            format!("{}/{}s/{}", self.url, R::resource_type(), resource.id())
+        );
 
         Ok(StoredParts { resource, meta: response.meta.into() })
     }
@@ -201,7 +185,7 @@ impl Tester {
     }
 
     fn nonexistent_resource_tests(&self) -> anyhow::Result<()> {
-        let random_id = Uuid::new_v4().to_string();
+        let random_id = Uuid::new_v4();
 
         // A GET of non-existent user = 404
         let result = self.get(format!("{}/Users/{}", self.url, random_id))?;
@@ -427,7 +411,7 @@ impl Tester {
         let body = json!(
             {
               "schemas": [
-                "urn:ietf:params:scim:api:messages:2.0:PatchOp"
+                PATCHOP_URN
               ],
               "Operations": [
                 {
@@ -467,7 +451,7 @@ impl Tester {
         let body = json!(
             {
               "schemas": [
-                "urn:ietf:params:scim:api:messages:2.0:PatchOp"
+                PATCHOP_URN
               ],
               "Operations": [
                 {
@@ -787,7 +771,7 @@ impl Tester {
         // Use a patch request to modify the groups displayName.
         let body = json!({
           "schemas": [
-            "urn:ietf:params:scim:api:messages:2.0:PatchOp"
+            PATCHOP_URN
           ],
           "Operations": [
             {
@@ -817,7 +801,7 @@ impl Tester {
         // Set the displayName back to what it was
         let body = json!({
           "schemas": [
-            "urn:ietf:params:scim:api:messages:2.0:PatchOp"
+            PATCHOP_URN
           ],
           "Operations": [
             {
@@ -864,7 +848,7 @@ impl Tester {
 
         let body = json!({
           "schemas": [
-            "urn:ietf:params:scim:api:messages:2.0:PatchOp"
+            PATCHOP_URN
           ],
           "Operations": [
             {
@@ -913,7 +897,7 @@ impl Tester {
         //
         let body = json!({
           "schemas": [
-            "urn:ietf:params:scim:api:messages:2.0:PatchOp"
+            PATCHOP_URN
           ],
           "Operations": [
             {
@@ -951,7 +935,7 @@ impl Tester {
 
         let body = json!({
           "schemas": [
-            "urn:ietf:params:scim:api:messages:2.0:PatchOp"
+            PATCHOP_URN
           ],
           "Operations": [
             {
@@ -1001,10 +985,10 @@ impl Tester {
                 bail!("unexpected group returned!");
             }
 
-            if let Some(members) = &groups[0].members {
-                if !members.is_empty() {
-                    bail!("existing Sales Reps group not empty!");
-                }
+            if let Some(members) = &groups[0].members
+                && !members.is_empty()
+            {
+                bail!("existing Sales Reps group not empty!");
             }
 
             groups.pop().unwrap().id
@@ -1022,10 +1006,10 @@ impl Tester {
             let users: Vec<User> = self.result_as_resource_list(result)?;
 
             for user in &users {
-                if let Some(groups) = &user.groups {
-                    if !groups.is_empty() {
-                        bail!("existing user {} groups not empty!", user.id);
-                    }
+                if let Some(groups) = &user.groups
+                    && !groups.is_empty()
+                {
+                    bail!("existing user {} groups not empty!", user.id);
                 }
             }
         }
@@ -1038,7 +1022,7 @@ impl Tester {
               "displayName": "Sales Reps",
               "members": [
                 {
-                  "value": Uuid::new_v4().to_string(),
+                  "value": Uuid::new_v4(),
                 }
               ]
             }

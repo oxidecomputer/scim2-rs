@@ -2,7 +2,10 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 
-use super::*;
+use crate::Error;
+
+use schemars::JsonSchema;
+use serde::Deserialize;
 
 #[derive(Deserialize, JsonSchema, Clone)]
 pub struct QueryParams {
@@ -13,8 +16,16 @@ pub struct QueryParams {
 }
 
 impl QueryParams {
-    pub fn filter(&self) -> Option<FilterOp> {
-        self.filter.as_ref().map(|f| parse_filter_param(f))
+    pub fn filter(&self) -> Result<Option<FilterOp>, Error> {
+        // self.filter.as_ref().map(|f| parse_filter_param(f))
+        match &self.filter {
+            Some(filter) => match parse_filter_param(filter) {
+                Ok(v) => Ok(Some(v)),
+                Err(e) => Err(e),
+            },
+
+            None => Ok(None),
+        }
     }
 }
 
@@ -24,10 +35,9 @@ impl QueryParams {
 pub enum FilterOp {
     UserNameEq(String),
     DisplayNameEq(String),
-    Invalid,
 }
 
-fn parse_filter_param(raw: &str) -> FilterOp {
+fn parse_filter_param(raw: &str) -> Result<FilterOp, Error> {
     // RFC 7644 - 3.4.2.2.  Filtering
     //
     // Attribute names and attribute operators used in filters are case
@@ -54,7 +64,7 @@ fn parse_filter_param(raw: &str) -> FilterOp {
     let parts: Vec<_> = raw.split(" eq ").collect();
 
     if parts.len() != 2 {
-        return FilterOp::Invalid;
+        return Err(Error::invalid_filter(format!("invalid filter {raw}")));
     }
 
     // The value portion of the expression must be a string wrapped in
@@ -67,9 +77,9 @@ fn parse_filter_param(raw: &str) -> FilterOp {
     };
 
     match (parts[0], is_quoted_value(parts[1])) {
-        ("username", Some(value)) => FilterOp::UserNameEq(value),
-        ("displayname", Some(value)) => FilterOp::DisplayNameEq(value),
-        _ => FilterOp::Invalid,
+        ("username", Some(value)) => Ok(FilterOp::UserNameEq(value)),
+        ("displayname", Some(value)) => Ok(FilterOp::DisplayNameEq(value)),
+        _ => Err(Error::invalid_filter(format!("filter {raw} not supported"))),
     }
 }
 
@@ -82,21 +92,21 @@ mod test {
     fn test_user_eq_filter() {
         assert_eq!(
             parse_filter_param("userName Eq \"Mike\""),
-            FilterOp::UserNameEq("mike".to_string())
+            Ok(FilterOp::UserNameEq("mike".to_string()))
         );
 
         assert_eq!(
             parse_filter_param("USERNAME eq \"JAMES\""),
-            FilterOp::UserNameEq("james".to_string())
+            Ok(FilterOp::UserNameEq("james".to_string()))
         );
 
         assert_eq!(
             parse_filter_param(
                 "USERNAME eq \"michael+dakota@oxidecomputer.com\""
             ),
-            FilterOp::UserNameEq(
+            Ok(FilterOp::UserNameEq(
                 "michael+dakota@oxidecomputer.com".to_string()
-            )
+            ))
         );
     }
 
@@ -104,30 +114,29 @@ mod test {
     fn test_group_eq_filter() {
         assert_eq!(
             parse_filter_param("displayName Eq \"PowerUsers\""),
-            FilterOp::DisplayNameEq("powerusers".to_string())
+            Ok(FilterOp::DisplayNameEq("powerusers".to_string()))
         );
 
         assert_eq!(
             parse_filter_param("dIsPlAyNaMe EQ \"Admins\""),
-            FilterOp::DisplayNameEq("admins".to_string())
+            Ok(FilterOp::DisplayNameEq("admins".to_string()))
         );
     }
 
     #[test]
     fn test_invalid_filter() {
-        assert_eq!(
-            parse_filter_param("displayName Eq \"PowerUsers\" extra values"),
-            FilterOp::Invalid
+        assert!(
+            parse_filter_param("displayName Eq \"PowerUsers\" extra values")
+                .is_err()
         );
 
-        assert_eq!(
-            parse_filter_param("extra value username EQ \"Admins\""),
-            FilterOp::Invalid
+        assert!(
+            parse_filter_param("extra value username EQ \"Admins\"").is_err()
         );
 
-        assert_eq!(
-            parse_filter_param("meta.lastModified gt \"2011-05-13T04:42:34Z\""),
-            FilterOp::Invalid
+        assert!(
+            parse_filter_param("meta.lastModified gt \"2011-05-13T04:42:34Z\"")
+                .is_err()
         );
     }
 }

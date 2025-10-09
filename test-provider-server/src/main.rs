@@ -10,6 +10,7 @@ use scim2_test_provider_server::create_http_server;
 #[derive(Debug, Parser)]
 #[clap(about = "SCIM 2 provider server")]
 struct Args {
+    // Note that port "4567" is arbitrarily chosen and is not SCIM specific.
     #[clap(long, default_value = "127.0.0.1:4567")]
     bind_addr: SocketAddr,
 }

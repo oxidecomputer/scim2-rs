@@ -2,9 +2,19 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 
-use slog::{Logger, error};
+use dropshot::Body;
+use http::Response;
+use slog::{Logger, debug, error};
 
-use super::*;
+use crate::in_memory_provider_store::{
+    InMemoryProviderStore, InMemoryProviderStoreState,
+};
+use crate::response::{Error, deleted_http_response};
+use crate::{
+    CreateGroupRequest, CreateUserRequest, Group, ListResponse, PatchRequest,
+    ProviderStore, ProviderStoreDeleteResult, ProviderStoreError, QueryParams,
+    SingleResourceResponse, StoredParts,
+};
 
 fn provider_error_to_error(
     log: &Logger,
@@ -44,13 +54,15 @@ impl<T: ProviderStore> Provider<T> {
         &self,
         query_params: QueryParams,
     ) -> Result<ListResponse, Error> {
-        let stored_users =
-            self.store.list_users(query_params.filter()).await.map_err(
-                provider_error_to_error(
-                    &self.log,
-                    "list users failed!".to_string(),
-                ),
-            )?;
+        let filter = query_params.filter()?;
+        debug!(self.log, "filter value"; "filter" => ?filter);
+
+        let stored_users = self.store.list_users(filter).await.map_err(
+            provider_error_to_error(
+                &self.log,
+                "list users failed!".to_string(),
+            ),
+        )?;
 
         ListResponse::from_resources(stored_users, query_params)
     }
@@ -83,12 +95,12 @@ impl<T: ProviderStore> Provider<T> {
     ) -> Result<SingleResourceResponse, Error> {
         // `groups` is readOnly, so clients cannot add users to groups when
         // creating new users.
-        if let Some(groups) = &request.groups {
-            if !groups.is_empty() {
-                return Err(Error::mutability(
-                    "attribute groups is readOnly".to_string(),
-                ));
-            }
+        if let Some(groups) = &request.groups
+            && !groups.is_empty()
+        {
+            return Err(Error::mutability(
+                "attribute groups is readOnly".to_string(),
+            ));
         }
 
         let StoredParts { resource, meta } =
@@ -134,7 +146,7 @@ impl<T: ProviderStore> Provider<T> {
             .ok_or(Error::not_found(user_id.to_string()))?;
 
         let StoredParts { resource: user, meta: _ } =
-            request.apply_user_ops(&stored_user)?;
+            request.apply_user_ops(&self.log, &stored_user)?;
 
         let request = CreateUserRequest {
             name: user.name,
@@ -176,13 +188,15 @@ impl<T: ProviderStore> Provider<T> {
         &self,
         query_params: QueryParams,
     ) -> Result<ListResponse, Error> {
-        let stored_groups =
-            self.store.list_groups(query_params.filter()).await.map_err(
-                provider_error_to_error(
-                    &self.log,
-                    "list groups failed!".to_string(),
-                ),
-            )?;
+        let filter = query_params.filter()?;
+        debug!(self.log, "filter value"; "filter" => ?filter);
+
+        let stored_groups = self.store.list_groups(filter).await.map_err(
+            provider_error_to_error(
+                &self.log,
+                "list groups failed!".to_string(),
+            ),
+        )?;
 
         ListResponse::from_resources(stored_groups, query_params)
     }
@@ -274,7 +288,7 @@ impl<T: ProviderStore> Provider<T> {
             .ok_or(Error::not_found(group_id.to_string()))?;
 
         let StoredParts { resource: group, meta: _ } =
-            request.apply_group_ops(&stored_group)?;
+            request.apply_group_ops(&self.log, &stored_group)?;
 
         let request = CreateGroupRequest {
             display_name: group.display_name,

@@ -2,14 +2,18 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 
-use http::header;
+use dropshot::Body;
+use http::{Response, StatusCode, header};
 use schemars::{
-    SchemaGenerator,
+    JsonSchema, SchemaGenerator,
     schema::{InstanceType, Schema, SchemaObject},
 };
-use serde::Deserializer;
+use serde::{Deserialize, Deserializer, Serialize};
 
-use super::*;
+use crate::{
+    Meta, PatchRequestError, QueryParams, Resource, StoredMeta, StoredParts,
+    urn::{ERROR_URN, LISTRESPONSE_URN},
+};
 
 const CONTENT_TYPE_SCIM_JSON: &str = "application/scim+json";
 
@@ -41,9 +45,7 @@ impl ListResponse {
     where
         R: Resource,
     {
-        let schemas = vec![String::from(
-            "urn:ietf:params:scim:api:messages:2.0:ListResponse",
-        )];
+        let schemas = vec![LISTRESPONSE_URN.to_string()];
 
         // TODO pagination should have happened before this, but fill in
         // start_index and items_per_page below based on query_params
@@ -120,7 +122,7 @@ impl SingleResourceResponse {
         Ok(SingleResourceResponse {
             resource,
             meta: Meta {
-                resource_type: R::resource_type(),
+                resource_type: R::resource_type().to_string(),
                 created: meta.created,
                 last_modified: meta.last_modified,
                 version: meta.version,
@@ -189,7 +191,7 @@ fn status_code_schema(_: &mut SchemaGenerator) -> Schema {
 }
 
 /// The SCIM error format is specified in RFC 7644, section 3.12
-#[derive(Deserialize, Serialize, JsonSchema, Debug)]
+#[derive(Deserialize, Serialize, JsonSchema, Debug, PartialEq)]
 pub struct Error {
     pub schemas: Vec<String>,
 
@@ -212,9 +214,7 @@ impl Error {
         detail: String,
     ) -> Self {
         Self {
-            schemas: vec![String::from(
-                "urn:ietf:params:scim:api:messages:2.0:Error",
-            )],
+            schemas: vec![ERROR_URN.to_string()],
             status,
             error_type,
             detail,
@@ -302,7 +302,7 @@ pub fn value_to_http_response<S: Serialize>(
             .body(
                 serde_json::json!(
                     {
-                    "schemas": ["urn:ietf:params:scim:api:messages:2.0:Error"],
+                    "schemas": [ERROR_URN],
                     "status": 500,
                     "detail": format!("{error_context}: {e}"),
                     }

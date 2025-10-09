@@ -1,13 +1,20 @@
+// This Source Code Form is subject to the terms of the Mozilla Public
+// License, v. 2.0. If a copy of the MPL was not distributed with this
+// file, You can obtain one at https://mozilla.org/MPL/2.0/.
+
 use iddqd::IdOrdMap;
 use schemars::JsonSchema;
 use serde::Deserialize;
+use slog::Logger;
+use slog::info;
 use unicase::UniCase;
 
 use crate::Group;
 use crate::GroupMember;
-use crate::ResourceType;
+use crate::PATCHOP_URN;
 use crate::StoredParts;
 use crate::User;
+use crate::utils::ResourceType;
 
 #[derive(Debug)]
 pub enum PatchRequestError {
@@ -16,13 +23,10 @@ pub enum PatchRequestError {
 }
 
 #[derive(Debug, Deserialize, JsonSchema, Clone)]
-#[serde(tag = "op")]
-pub enum PatchOp {
-    #[serde(rename = "replace")]
+#[serde(tag = "op", rename_all = "camelCase")]
+enum PatchOp {
     Replace { path: Option<String>, value: serde_json::Value },
-    #[serde(rename = "add")]
     Add { path: Option<String>, value: serde_json::Value },
-    #[serde(rename = "remove")]
     Remove { path: String },
 }
 
@@ -37,8 +41,7 @@ impl PatchRequest {
     /// Ensure that the parsed `PatchRequest` contians the expected schema
     /// field.
     fn validate_schema(&self) -> Result<(), PatchRequestError> {
-        const URN: &str = "urn:ietf:params:scim:api:messages:2.0:PatchOp";
-        match matches!(&self.schemas[..], [val] if val == URN) {
+        match matches!(&self.schemas[..], [val] if val == PATCHOP_URN) {
             true => Ok(()),
             false => Err(PatchRequestError::Invalid(format!(
                 "invalid patch schema {:?}",
@@ -51,18 +54,50 @@ impl PatchRequest {
     /// applying a series of `PatchOp`s to the original object.
     pub fn apply_user_ops(
         &self,
+        log: &Logger,
         stored_user: &StoredParts<User>,
     ) -> Result<StoredParts<User>, PatchRequestError> {
         self.validate_schema()?;
         let mut updated_user = stored_user.clone();
 
+        // RFC 7644 3.5.2
+        //
+        // Each PATCH operation represents a single action to be applied to
+        // the same SCIM resource specified by the request URI.  Operations
+        // are applied sequentially in the order they appear in the array.
+        // Each operation in the sequence is applied to the target resource;
+        // the resulting resource becomes the target of the next operation.
+        // Evaluation continues until all operations are successfully applied or
+        // until an error condition is encountered.
         for patch_op in &self.operations {
-            let PatchOp::Replace { path: _, value } = patch_op else {
+            let PatchOp::Replace { path, value } = patch_op else {
                 return Err(PatchRequestError::Unsupported(
                     "only the replace op is supported for users".to_string(),
                 ));
             };
 
+            // 3.5.2.3.  Replace Operation
+            //
+            // If the "path" parameter is omitted, the target is assumed to be
+            // the resource itself.  In this case, the "value" attribute SHALL
+            // contain a list of one or more attributes that are to be replaced.
+            //
+            // NB: We are only allowing changes to the resource itself until
+            // we support other IdPs outside of Okta.
+            if let Some(_path) = path {
+                return Err(PatchRequestError::Unsupported(
+                    "only replacing a value on the User resource itself is
+                        supported"
+                        .to_string(),
+                ));
+            }
+
+            // The changes coming in via a replace operation may change multiple
+            // fields at once, however we only care about the `active` field.
+            // We considered using `#[serde(deny_unknown_fields)]` here but that
+            // would break any request that sends multiple values at once. Most
+            // of the values that would be sent here are not currently tracked
+            // in our `User` type as they are irrelevant.
             #[derive(Debug, Deserialize)]
             struct Active {
                 active: bool,
@@ -76,6 +111,13 @@ impl PatchRequest {
                 ));
             };
 
+            info!(
+              log,
+              "PatchOp setting user active property";
+              "user" => ?stored_user.resource.id,
+              "old" => ?stored_user.resource.active,
+              "new" => ?change.active,
+            );
             updated_user.resource.active = Some(change.active);
         }
 
@@ -86,25 +128,37 @@ impl PatchRequest {
     /// applying a series of `PatchOp`s to the original object.
     pub fn apply_group_ops(
         &self,
+        log: &Logger,
         stored_group: &StoredParts<Group>,
     ) -> Result<StoredParts<Group>, PatchRequestError> {
         self.validate_schema()?;
         let mut updated_group = stored_group.clone();
 
+        // RFC 7644 3.5.2
+        //
+        // Each PATCH operation represents a single action to be applied to
+        // the same SCIM resource specified by the request URI.  Operations
+        // are applied sequentially in the order they appear in the array.
+        // Each operation in the sequence is applied to the target resource;
+        // the resulting resource becomes the target of the next operation.
+        // Evaluation continues until all operations are successfully applied or
+        // until an error condition is encountered.
         for patch_op in &self.operations {
             match patch_op {
                 PatchOp::Replace { path, value } => apply_group_replace_op(
+                    log,
                     path.as_ref(),
                     value,
                     &mut updated_group,
                 )?,
                 PatchOp::Add { path, value } => apply_group_add_op(
+                    log,
                     path.as_deref(),
                     value,
                     &mut updated_group,
                 )?,
                 PatchOp::Remove { path } => {
-                    apply_group_remove_op(path, &mut updated_group)?
+                    apply_group_remove_op(log, path, &mut updated_group)?
                 }
             }
         }
@@ -114,6 +168,7 @@ impl PatchRequest {
 }
 
 fn apply_group_replace_op(
+    log: &Logger,
     path: Option<&String>,
     value: &serde_json::Value,
     group: &mut StoredParts<Group>,
@@ -150,6 +205,14 @@ fn apply_group_replace_op(
                     value: Some(member.value),
                 })
                 .collect();
+
+            info!(log,
+                "PatchOp replacing group members";
+                "group" => %group.resource.id,
+                "old" => ?group.resource.members,
+                "new" => ?new_members,
+            );
+
             group.resource.members =
                 (!new_members.is_empty()).then_some(new_members);
         }
@@ -193,6 +256,7 @@ fn apply_group_replace_op(
 }
 
 fn apply_group_add_op(
+    log: &Logger,
     path: Option<&str>,
     value: &serde_json::Value,
     group: &mut StoredParts<Group>,
@@ -229,12 +293,28 @@ fn apply_group_add_op(
             )));
         }
 
-        group.resource.members.get_or_insert_default().insert_overwrite(
-            GroupMember {
-                resource_type: Some(ResourceType::User.to_string()),
-                value: Some(member.value),
-            },
-        );
+        // 3.5.2.1.  Add Operation
+        //
+        // If the target location already contains the value specified, no
+        // changes SHOULD be made to the resource, and a success response
+        // SHOULD be returned.  Unless other operations change the resource,
+        // this operation SHALL NOT change the modify timestamp of the
+        // resource.
+        if let Some(old_member) =
+            group.resource.members.get_or_insert_default().insert_overwrite(
+                GroupMember {
+                    resource_type: Some(ResourceType::User.to_string()),
+                    value: Some(member.value),
+                },
+            )
+        {
+            // We are replacing an existing value
+            info!(log,
+                "PatchOp adding existing group member";
+                "group" => %group.resource.id,
+                "group_member" => ?old_member,
+            )
+        };
     }
 
     Ok(())
@@ -250,8 +330,13 @@ fn parse_remove_path(path: &str) -> Result<GroupRemoveOp, PatchRequestError> {
     match path.as_str() {
         "members" => Ok(GroupRemoveOp::All),
         path => {
-            let path = path.trim_start_matches("members[value eq ");
-            let value = path.trim_end_matches(']');
+            let value = path
+                .strip_prefix("members[value eq ")
+                .and_then(|p| p.strip_suffix(']'))
+                .ok_or(PatchRequestError::Invalid(
+                    "path should be specified as members[value eq \"<VALUE>\"]"
+                        .to_string(),
+                ))?;
 
             // The value portion of the expression must be a string wrapped in
             // quotations
@@ -273,6 +358,7 @@ fn parse_remove_path(path: &str) -> Result<GroupRemoveOp, PatchRequestError> {
 }
 
 fn apply_group_remove_op(
+    log: &Logger,
     path: &str,
     group: &mut StoredParts<Group>,
 ) -> Result<(), PatchRequestError> {
@@ -280,7 +366,27 @@ fn apply_group_remove_op(
         GroupRemoveOp::All => group.resource.members = Some(IdOrdMap::new()),
         GroupRemoveOp::Indvidual(value) => {
             let groups = group.resource.members.get_or_insert_default();
-            groups.remove(&Some(UniCase::new(value.as_str())));
+
+            // 3.5.2.2.  Remove Operation
+            //
+            // If the user was not a member of this group, no changes should be made
+            // to the resource, and a success response should be returned.
+            match groups.remove(&Some(UniCase::new(value.as_str()))) {
+                Some(removed) => info!(
+                    log,
+                    "PatchOp removed member from group";
+                    "group" => %group.resource.id,
+                    "member" => ?removed,
+                ),
+                None => {
+                    info!(
+                        log,
+                        "PatchOp attempted to remove non group member";
+                        "group" => %group.resource.id,
+                        "member" => %value
+                    );
+                }
+            };
         }
     };
 
@@ -293,14 +399,14 @@ mod test {
 
     use crate::{
         PatchRequest,
-        patch::{GroupRemoveOp, parse_remove_path},
+        patch::{GroupRemoveOp, PATCHOP_URN, parse_remove_path},
     };
 
     #[test]
     fn test_parse_user_active_replace_op() {
         let json = json!({
           "schemas": [
-            "urn:ietf:params:scim:api:messages:2.0:PatchOp"
+            PATCHOP_URN
           ],
           "Operations": [
             {
@@ -319,7 +425,7 @@ mod test {
     fn test_parse_group_displayname_replace_op() {
         let json = json!({
           "schemas": [
-            "urn:ietf:params:scim:api:messages:2.0:PatchOp"
+            PATCHOP_URN
           ],
           "Operations": [
             {
@@ -339,7 +445,7 @@ mod test {
     fn test_parse_group_members_replace_op() {
         let json = json!({
           "schemas": [
-            "urn:ietf:params:scim:api:messages:2.0:PatchOp"
+            PATCHOP_URN
           ],
           "Operations": [
             {
@@ -362,7 +468,7 @@ mod test {
     fn test_parse_group_membership_ops() {
         let json = json!({
           "schemas": [
-            "urn:ietf:params:scim:api:messages:2.0:PatchOp"
+            PATCHOP_URN
           ],
           "Operations": [
             {

@@ -2,8 +2,17 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 
-use super::*;
+use crate::response::Error;
+use crate::utils::ResourceType;
+use crate::{
+    CreateGroupRequest, CreateUserRequest, FilterOp, Group, GroupMember,
+    ProviderStore, ProviderStoreDeleteResult, ProviderStoreError, StoredMeta,
+    StoredParts, User, UserGroup, UserGroupType,
+};
 
+use chrono::Utc;
+use schemars::JsonSchema;
+use serde::Serialize;
 use std::collections::BTreeMap;
 use std::str::FromStr;
 use std::sync::Mutex;
@@ -110,7 +119,6 @@ impl InMemoryProviderStore {
     }
 }
 
-#[async_trait]
 impl ProviderStore for InMemoryProviderStore {
     async fn get_user_by_id(
         &self,
@@ -510,8 +518,8 @@ mod test {
     use uuid::Uuid;
 
     use crate::{
-        Group, ListResponse, Resource, ResourceType, SingleResourceResponse,
-        StoredMeta, StoredParts, User,
+        Group, ListResponse, PATCHOP_URN, Resource, ResourceType,
+        SingleResourceResponse, StoredMeta, StoredParts, User,
     };
 
     struct ServerCtx {
@@ -861,7 +869,7 @@ mod test {
         let body = json!(
             {
               "schemas": [
-                "urn:ietf:params:scim:api:messages:2.0:PatchOp"
+                  PATCHOP_URN
               ],
               "Operations": [
                 {
@@ -1138,7 +1146,7 @@ mod test {
         let new_display_name = "Warehouse Workers";
         let body = json!({
           "schemas": [
-            "urn:ietf:params:scim:api:messages:2.0:PatchOp"
+            PATCHOP_URN
           ],
           "Operations": [
             {
@@ -1172,7 +1180,7 @@ mod test {
 
         let body = json!({
           "schemas": [
-            "urn:ietf:params:scim:api:messages:2.0:PatchOp"
+            PATCHOP_URN
           ],
           "Operations": [
             {
@@ -1231,7 +1239,7 @@ mod test {
 
         let body = json!({
           "schemas": [
-            "urn:ietf:params:scim:api:messages:2.0:PatchOp"
+            PATCHOP_URN
           ],
           "Operations": [
             {
@@ -1277,7 +1285,7 @@ mod test {
 
         let body = json!({
           "schemas": [
-            "urn:ietf:params:scim:api:messages:2.0:PatchOp"
+            PATCHOP_URN
           ],
           "Operations": [
             {
@@ -1316,7 +1324,7 @@ mod test {
 
         let body = json!({
           "schemas": [
-            "urn:ietf:params:scim:api:messages:2.0:PatchOp"
+            PATCHOP_URN
           ],
           "Operations": [
             {
@@ -1369,7 +1377,7 @@ mod test {
 
         let body = json!({
           "schemas": [
-            "urn:ietf:params:scim:api:messages:2.0:PatchOp"
+            PATCHOP_URN
           ],
           "Operations": [
             {

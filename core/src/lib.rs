@@ -2,17 +2,9 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 
-use async_trait::async_trait;
-use chrono::DateTime;
-use chrono::Utc;
-use dropshot::Body;
-use http::Response;
-use http::StatusCode;
-use iddqd::IdOrdItem;
-use iddqd::IdOrdMap;
-use schemars::JsonSchema;
-use serde::Deserialize;
-use serde::Serialize;
+//! This crate implements a subset of System for Cross-domain Identity
+//! Management version 2.0 (SCIM) or RFC 7643 (schema) and RFC 7644 (protocol).
+//! At the moment it is known to work specifically with Okta serving as an IdP.
 
 mod group;
 mod in_memory_provider_store;
@@ -23,66 +15,38 @@ mod provider_store;
 mod query_params;
 mod resource;
 mod response;
+mod urn;
 mod user;
+mod utils;
 
-pub use group::*;
-pub use in_memory_provider_store::*;
-pub use meta::*;
-pub use patch::*;
-pub use provider::*;
-pub use provider_store::*;
-pub use query_params::*;
-pub use resource::*;
-pub use response::*;
-pub use user::*;
-
-/// Skip serializing if optional list is None or empty
-pub fn skip_serializing_list<T>(members: &Option<Vec<T>>) -> bool {
-    match members {
-        None => true,
-        Some(v) => v.is_empty(),
-    }
-}
-
-/// Skip serializing if optional list is None or empty for IdOrdMap
-pub fn skip_serializing_list_map<T>(members: &Option<IdOrdMap<T>>) -> bool
-where
-    T: IdOrdItem,
-{
-    match members {
-        None => true,
-        Some(v) => v.is_empty(),
-    }
-}
-
-#[derive(Clone, Debug, PartialEq, Serialize, JsonSchema)]
-pub enum ResourceType {
-    User,
-    Group,
-}
-
-impl std::str::FromStr for ResourceType {
-    type Err = String;
-
-    fn from_str(r: &str) -> Result<Self, Self::Err> {
-        match r.to_lowercase().as_str() {
-            "user" => Ok(ResourceType::User),
-            "group" => Ok(ResourceType::Group),
-            _ => Err(format!("{r} not a valid resource type")),
-        }
-    }
-}
-
-impl std::fmt::Display for ResourceType {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        match self {
-            ResourceType::User => {
-                write!(f, "User")
-            }
-
-            ResourceType::Group => {
-                write!(f, "Group")
-            }
-        }
-    }
-}
+pub use group::CreateGroupRequest;
+pub use group::Group;
+pub use group::GroupMember;
+pub use in_memory_provider_store::InMemoryProviderStore;
+pub use in_memory_provider_store::InMemoryProviderStoreState;
+pub use meta::Meta;
+pub use meta::StoredMeta;
+pub use meta::StoredParts;
+pub use patch::PatchRequest;
+pub use patch::PatchRequestError;
+pub use provider::Provider;
+pub use provider_store::ProviderStore;
+pub use provider_store::ProviderStoreDeleteResult;
+pub use provider_store::ProviderStoreError;
+pub use query_params::FilterOp;
+pub use query_params::QueryParams;
+pub use resource::Resource;
+pub use response::Error;
+pub use response::ErrorType;
+pub use response::ListResponse;
+pub use response::SingleResourceResponse;
+pub use urn::GROUP_URN;
+pub use urn::LISTRESPONSE_URN;
+pub use urn::PATCHOP_URN;
+pub use urn::RESOURCETYPE_URN;
+pub use urn::USER_URN;
+pub use user::CreateUserRequest;
+pub use user::User;
+pub use user::UserGroup;
+pub use user::UserGroupType;
+pub use utils::ResourceType;

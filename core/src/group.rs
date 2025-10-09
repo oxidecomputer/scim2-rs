@@ -3,9 +3,12 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 
 use iddqd::{IdOrdItem, IdOrdMap, id_upcast};
+use schemars::JsonSchema;
+use serde::{Deserialize, Serialize};
 use unicase::UniCase;
 
-use super::*;
+use crate::utils::skip_serializing_list_map;
+use crate::{GROUP_URN, Resource, ResourceType};
 
 #[derive(Deserialize, JsonSchema, Clone)]
 #[serde(rename_all = "camelCase")]
@@ -40,11 +43,11 @@ impl Resource for Group {
     }
 
     fn schema() -> String {
-        String::from("urn:ietf:params:scim:schemas:core:2.0:Group")
+        GROUP_URN.to_string()
     }
 
-    fn resource_type() -> String {
-        String::from("Group")
+    fn resource_type() -> ResourceType {
+        ResourceType::Group
     }
 }
 

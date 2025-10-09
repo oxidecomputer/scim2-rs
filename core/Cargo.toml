@@ -1,11 +1,11 @@
 [package]
 name = "scim2-rs"
 version = "0.1.0"
-edition = "2024"
+edition.workspace = true
+license.workspace = true
 
 [dependencies]
 anyhow.workspace = true
-async-trait.workspace = true
 chrono.workspace = true
 dropshot.workspace = true
 http.workspace = true
@@ -14,10 +14,11 @@ schemars.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 slog.workspace = true
+trait-variant.workspace = true
 unicase.workspace = true
 uuid.workspace = true
 
 [dev-dependencies]
+reqwest.workspace = true
 scim2-test-provider-server = { path = "../test-provider-server" }
 tokio.workspace = true
-reqwest.workspace = true
