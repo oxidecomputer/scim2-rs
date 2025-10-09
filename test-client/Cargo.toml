@@ -11,6 +11,6 @@ reqwest.workspace = true
 scim2-rs.workspace = true
 serde.workspace = true
 serde_json.workspace = true
+tokio.workspace = true
 unicase.workspace = true
 uuid.workspace = true
-

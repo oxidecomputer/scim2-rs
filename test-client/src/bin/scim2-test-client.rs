@@ -16,11 +16,12 @@ struct Args {
     bearer: Option<String>,
 }
 
-fn main() -> anyhow::Result<()> {
+#[tokio::main]
+async fn main() -> anyhow::Result<()> {
     let opt: Args = Args::try_parse()?;
 
     let tester = Tester::new(opt.url, opt.bearer)?;
-    tester.run()?;
+    tester.run().await?;
 
     println!("SUCCESS");
 
