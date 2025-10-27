@@ -257,7 +257,7 @@ impl Error {
         )
     }
 
-    pub fn unathorized() -> Self {
+    pub fn unauthorized() -> Self {
         Self::new(
             StatusCode::UNAUTHORIZED,
             None,
