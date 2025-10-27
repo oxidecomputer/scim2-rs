@@ -110,9 +110,10 @@ impl<T: ProviderStore> Provider<T> {
         if let Some(groups) = maybe_groups
             && !groups.is_empty()
         {
-            info!(self.log, "CreateUserRequest contained group memberships for
-                readOnly attribute groups that are being ignored.";
-                "members" => ?groups,
+            info!(self.log,
+                "CreateUserRequest contained group memberships for readOnly \
+                attribute groups that are being ignored.";
+                "groups" => ?groups,
             );
         }
 

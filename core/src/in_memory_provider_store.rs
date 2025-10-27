@@ -739,6 +739,45 @@ mod test {
     }
 
     #[tokio::test]
+    async fn test_create_user_with_group_membership() {
+        let ctx = setup().await.unwrap();
+
+        let user_name = "cbratton";
+        // Test that creating a user with a group membership is still created
+        // and it's memberships are IGNORED
+        let body = json!({
+            "userName": user_name,
+            "externalId": "cbratton@dundermifflin.com",
+            "groups": [
+                {
+                  "value": "fc348aa8-3835-40eb-a20b-c726e15c55b5",
+                  "$ref":
+                  "https://example.com/v2/Groups/fc348aa8-3835-40eb-a20b-c726e15c55b5",
+                  "display": "Employees"
+                },
+            ]
+        });
+
+        let result = ctx
+            .client
+            .post(format!("{}/Users", ctx.base_url))
+            .json(&body)
+            .send()
+            .await
+            .unwrap();
+
+        // User is created
+        assert_eq!(result.status(), StatusCode::CREATED);
+
+        let StoredParts::<User> { resource: user, .. } =
+            result_as_resource(result).await.unwrap();
+        assert_eq!(user.name, user_name);
+
+        // Ensure that the user did not end up with any group memberships
+        assert_eq!(user.groups, None);
+    }
+
+    #[tokio::test]
     async fn test_list_users() {
         let ctx = setup().await.unwrap();
         let (jim, _meta) = create_jim_user(&ctx).await.unwrap();
