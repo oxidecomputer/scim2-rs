@@ -4,7 +4,7 @@
 
 use dropshot::Body;
 use http::Response;
-use slog::{Logger, debug, error};
+use slog::{Logger, debug, error, info};
 
 use crate::in_memory_provider_store::{
     InMemoryProviderStore, InMemoryProviderStoreState,
@@ -91,16 +91,29 @@ impl<T: ProviderStore> Provider<T> {
 
     pub async fn create_user(
         &self,
-        request: CreateUserRequest,
+        mut request: CreateUserRequest,
     ) -> Result<SingleResourceResponse, Error> {
+        // RFC 7643 4.1.1.  Singular Attributes
+        //
         // `groups` is readOnly, so clients cannot add users to groups when
         // creating new users.
-        if let Some(groups) = &request.groups
+        //
+        // RFC 7644 3.3.  Creating Resources
+        //
+        // In the request body, attributes whose mutability is "readOnly"
+        // (see Sections 2.2 and 7 of [RFC7643]) SHALL be ignored.
+        //
+        // If some group memberships were passed in on create we are going to
+        // ignore them like the RFC says to do, but the least we can do is log
+        // that the request had some group memberships present.
+        let maybe_groups = std::mem::take(&mut request.groups);
+        if let Some(groups) = maybe_groups
             && !groups.is_empty()
         {
-            return Err(Error::mutability(
-                "attribute groups is readOnly".to_string(),
-            ));
+            info!(self.log, "CreateUserRequest contained group memberships for
+                readOnly attribute groups that are being ignored.";
+                "members" => ?groups,
+            );
         }
 
         let StoredParts { resource, meta } =
