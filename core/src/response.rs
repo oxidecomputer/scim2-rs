@@ -257,6 +257,25 @@ impl Error {
         )
     }
 
+    pub fn unauthorized() -> Self {
+        Self::new(
+            StatusCode::UNAUTHORIZED,
+            None,
+            "Authorization failure. The authorization header is invalid or \
+                missing"
+                .to_string(),
+        )
+    }
+
+    pub fn forbidden() -> Self {
+        Self::new(
+            StatusCode::FORBIDDEN,
+            None,
+            "Operation is not permitted based on the supplied authorization"
+                .to_string(),
+        )
+    }
+
     pub fn not_implemented(detail: String) -> Self {
         Self::new(StatusCode::NOT_IMPLEMENTED, None, detail)
     }
