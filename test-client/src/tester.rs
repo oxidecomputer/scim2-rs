@@ -315,7 +315,7 @@ impl Tester {
             .client
             .post(format!("{}/Users", self.url))
             .json(&body)
-            .headers(self.headers.clone())
+            .headers(headers)
             .send()
             .await?;
 
