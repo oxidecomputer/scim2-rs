@@ -305,12 +305,15 @@ impl Tester {
 
         // Don't call `self.post()` so that we can maniuplate the headers.
         let mut headers = self.headers.clone();
-        headers
-            .insert(
-                header::AUTHORIZATION,
-                header::HeaderValue::from_str("Bearer this-is-invalid")?,
-            )
-            .expect("replaced a known good bearer token");
+        let Some(_old_bearer) = headers.insert(
+            header::AUTHORIZATION,
+            header::HeaderValue::from_str("Bearer this-is-invalid")?,
+        ) else {
+            // The client was constructed without a bearer token so this test is
+            // pointless.
+            return Ok(());
+        };
+
         let result = self
             .client
             .post(format!("{}/Users", self.url))
