@@ -124,6 +124,10 @@ impl Tester {
             .await
             .context("nonexistent_resource_tests")?;
 
+        self.unauthorized_status_test()
+            .await
+            .context("unauthorized_status_test")?;
+
         let dwight =
             self.create_user_tests().await.context("create_user_tests")?;
         let jim = self.create_jim_user().await.context("create_jim_user")?;
@@ -288,6 +292,35 @@ impl Tester {
                 result.status(),
                 StatusCode::NOT_FOUND,
             );
+        }
+
+        Ok(())
+    }
+
+    async fn unauthorized_status_test(&self) -> anyhow::Result<()> {
+        let body = json!({
+            "userName": "amartin",
+            "externalId": "amartin@dundermifflin.com",
+        });
+
+        // Don't call `self.post()` so that we can maniuplate the headers.
+        let mut headers = self.headers.clone();
+        headers
+            .insert(
+                header::AUTHORIZATION,
+                header::HeaderValue::from_str("Bearer this-is-invalid")?,
+            )
+            .expect("replaced a known good bearer token");
+        let result = self
+            .client
+            .post(format!("{}/Users", self.url))
+            .json(&body)
+            .headers(self.headers.clone())
+            .send()
+            .await?;
+
+        if result.status() != StatusCode::UNAUTHORIZED {
+            bail!("POST to /Users returned status code {}", result.status());
         }
 
         Ok(())
