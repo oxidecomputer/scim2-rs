@@ -363,7 +363,7 @@ fn apply_group_remove_op(
             //
             // If the user was not a member of this group, no changes should be made
             // to the resource, and a success response should be returned.
-            match groups.remove(&Some(UniCase::new(value.as_str()))) {
+            match groups.remove(Some(UniCase::new(value.as_str()))) {
                 Some(removed) => info!(
                     log,
                     "PatchOp removed member from group";
